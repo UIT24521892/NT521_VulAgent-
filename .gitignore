@@ -1,0 +1,17 @@
+# macOS metadata
+.DS_Store
+
+# Dependencies and Python caches
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local credentials and environment settings
+.env
+.env.*
+!.env.example
+.aws/
+.ssh/
