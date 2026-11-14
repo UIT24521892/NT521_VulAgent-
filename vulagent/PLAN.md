@@ -1,6 +1,6 @@
 # Kế hoạch VulAgent
 
-Nguồn: tách từ [../_archive/Huong_dan_hoc_va_thuc_hien_S01_VulAgent.md](../_archive/Huong_dan_hoc_va_thuc_hien_S01_VulAgent.md) (mục 4–6) và đặc tả chi tiết ở [references/prompt_nhom_3.md](references/prompt_nhom_3.md). **Chưa kích hoạt** — xem [../ROADMAP.md](../ROADMAP.md).
+Nguồn: tách từ [../_archive/Huong_dan_hoc_va_thuc_hien_S01_VulAgent.md](../_archive/Huong_dan_hoc_va_thuc_hien_S01_VulAgent.md) (mục 4–6) và đặc tả chi tiết ở [references/prompt_nhom_3.md](references/prompt_nhom_3.md). **Đã kích hoạt 2026-11-06** (xong Giai đoạn A + C0 offline; chi tiết Giai đoạn C ở [docs/reproduction_plan.md](docs/reproduction_plan.md)) — trạng thái hiện tại xem [../ROADMAP.md](../ROADMAP.md).
 
 ## 1. Đọc paper để hiểu phương pháp
 
@@ -30,7 +30,7 @@ Tên giai đoạn, schema, cách chia dữ liệu, metric phải trích đúng *
 |---|---|---|
 | A — Kiểm toán nguồn, khóa giao thức | Đọc repo gốc, đối chiếu 2 bản paper, tìm key nhúng, khóa manifest | `docs/source_audit.md`, `experiment_manifest.yaml`, `docs/reproduction_contract.md` |
 | B — Hiện thực/chuẩn hóa pipeline | MetaAgent → Detection → Aggregator → TriggerPlanner → AssumptionPruner → FinalValidator → Output JSON | Mã chạy một cặp, trace trung gian, demo |
-| C — Tái hiện thực nghiệm | 435 cặp PrimeVul (ACL), SVEN 803 cặp split 8:1:1 (xác định đúng test IDs), baseline one-shot/CoT cùng backend, metric, ablation | Kết quả thô JSONL/CSV, script metric, bảng, log chi phí |
+| C — Tái hiện thực nghiệm | 435 cặp PrimeVul (ACL), SVEN 803 cặp (paper ghi split 9:1 train/validation, không nêu test; repo dùng 83 cặp — chưa đối chiếu được test IDs), baseline one-shot/CoT cùng backend, metric, ablation | Kết quả thô JSONL/CSV, script metric, bảng, log chi phí |
 | D — Điểm cộng, biện luận | Chọn **một** hướng: (a) context chọn lọc theo giả thuyết, (b) dữ liệu mới, (c) độ bền khi thiếu context | Thí nghiệm đối chứng; mục ưu/nhược/giới hạn |
 
 Điểm bắt buộc nhớ:
@@ -39,7 +39,7 @@ Tên giai đoạn, schema, cách chia dữ liệu, metric phải trích đúng *
 - TriggerPlanner không tự loại đường vì thấy guard; AssumptionPruner chỉ loại khi có chứng cứ mâu thuẫn; FinalValidator bác bỏ khi protection chặn **mọi** đường khả thi.
 - Phân biệt `candidate`, `retained hypothesis`, `confirmed by ground truth`.
 - Số trích từ paper là **tham chiếu lịch sử**, không phải chạy cùng điều kiện. CWE oracle chỉ dùng ở thí nghiệm `oracle-CWE` riêng.
-- Metric: ACC, precision, recall, F1, `FPR = FP/(FP+TN)`, P-C, P-R, `VPS = P-C − P-R`; theo ACL 2026, P-R là cặp bị đảo nhãn (vulnerable→benign và fixed→vulnerable). Kiểm tra bằng bảng TP/FP/TN/FN tính tay; gắn cặp theo ID, không theo thứ tự file.
+- Metric: ACC, precision, recall, F1, `FPR = FP/(FP+TN)`, P-C, P-R, `VPS = P-C − P-R`; theo ACL 2026, P-R là cặp bị đảo nhãn (vulnerable→benign và fixed→vulnerable). Kiểm tra bằng bảng TP/FP/TN/FN tính tay; sample-level map dự đoán↔nhãn theo `idx`; pair-level ghép theo hai dòng liền kề của file ground-truth (PrimeVul có idx khác nhau trong cặp và 2 idx trùng — xem [docs/source_audit.md](docs/source_audit.md) §7.3).
 - Ablation: bỏ đúng một thành phần (AssumptionPruner, FinalValidator hoặc context), giữ nguyên model, IDs, config.
 - Phân tích ≥ 3 ca: TP, FP đã loại nhờ kiểm chứng, FN hoặc FP còn sót; chỉ ra source/sink/guard trên code thật.
 - Ghi giới hạn: chất lượng nhãn, thiếu context, nhiễm dữ liệu huấn luyện, biến động model, cỡ mẫu.

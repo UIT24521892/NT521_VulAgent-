@@ -20,7 +20,8 @@ Return-to-libc là kỹ thuật tái sử dụng mã, không phải tên của l
 | [PLAN.md](PLAN.md) | 10 mục của đề, kịch bản demo, 14 slide và các mốc thực hiện |
 | [KNOWLEDGE.md](KNOWLEDGE.md) | Nền tảng stack/ABI, thư viện động, bảo vệ và câu hỏi tự kiểm tra |
 | [CHECKLIST.md](CHECKLIST.md) | Điều kiện hoàn thành và bằng chứng cần thu mới cho S05 |
-| [CVE-1999-0032](cve/CVE-1999-0032.md) | Ca CVE được chọn cho S05; ghi chú nguồn, quan hệ với ret2libc và khắc phục |
+| [CVE-2018-5767](cve/CVE-2018-5767.md) | **Ca CVE chính**: Tenda AC15, ret2libc trên ARM, NX bật, RCE từ xa CVSS 9.8; chỉ dòng code `sscanf`, kịch bản giảng |
+| [CVE-1999-0032](cve/CVE-1999-0032.md) | **Bước đệm lịch sử**: lpr, nơi return-into-libc ra đời (1997); ghi chú nguồn, phân tích mã và khắc phục |
 
 Các đầu ra `demo/`, `evidence/`, `slides/`, `notes/` của S05 sẽ được tạo khi thực hiện bước tương ứng trong kế hoạch. Chưa có kết quả chạy binary S05.
 
@@ -33,7 +34,7 @@ Các đầu ra `demo/`, `evidence/`, `slides/`, `notes/` của S05 sẽ được
 | Demo chính | **Dự kiến:** [ROP Emporium split x86_64](https://ropemporium.com/challenge/split.html). Trang challenge mô tả NX, hàm `system()` được import và chuỗi `/bin/cat flag.txt`; phải xác nhận trên binary thực tế |
 | Cách gọi đúng demo | Tái sử dụng libc qua `system@plt` bằng ROP ngắn. Chỉ xác nhận đường gọi cụ thể sau disassembly/debugger; chưa chứng minh gọi trực tiếp địa chỉ libc, leak libc base hay vượt ASLR |
 | Demo mở rộng | Direct ret2libc nếu đủ thời gian và đã xác minh đúng libc build/base tại runtime |
-| CVE | **Chọn CVE-1999-0032** theo mức độ phù hợp S05; nguồn và giới hạn ở [ghi chú CVE](cve/CVE-1999-0032.md). Chỉ nghiên cứu và trình bày |
+| CVE | **Ca chính [CVE-2018-5767](cve/CVE-2018-5767.md)** (Tenda AC15, 2018, RCE từ xa 9.8) + **bước đệm [CVE-1999-0032](cve/CVE-1999-0032.md)** (lpr, 1996). Cùng lỗi CWE-121 + kỹ thuật ret2libc, cách nhau 21 năm. Chỉ nghiên cứu, không tái hiện |
 | Ngày seminar / thành viên | `[CHƯA CHỐT: ngày]`, `[CHƯA CHỐT: A=…, B=…, C=…]` |
 
 ## Hai đường gọi thư viện cần phân biệt

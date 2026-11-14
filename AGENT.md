@@ -9,9 +9,9 @@ Nhóm 3 sinh viên, môn **NT521 – Lập trình khai thác lỗ hổng**. Hai 
 | Phần | Thư mục | Sản phẩm | Trạng thái |
 |---|---|---|---|
 | Mini seminar **S05 – Return-to-libc (ret2libc)** | [seminar_S05/](seminar_S05/) | Slide 12–14 trang + demo CTF + CVE, 20–30 phút | **ĐANG LÀM (đổi chủ đề ngày 2026-10-19)** |
-| Đề tài **VulAgent** – phát hiện lỗ hổng bằng lập và kiểm chứng giả thuyết | [vulagent/](vulagent/) | Mã pipeline, dữ liệu đánh giá, báo cáo, slide | Chưa bắt đầu; chỉ làm khi nhóm chuyển trọng tâm |
+| Đề tài **VulAgent** – phát hiện lỗ hổng bằng lập và kiểm chứng giả thuyết | [vulagent/](vulagent/) | Mã pipeline, dữ liệu đánh giá, báo cáo, slide | **ĐÃ KÍCH HOẠT 2026-11-06**: xong Giai đoạn A + C0 (offline); chưa chạy LLM, chưa có pipeline của nhóm |
 
-**Quy tắc trọng tâm:** trừ khi người dùng nói rõ, chỉ làm việc trong `seminar_S05/`. Không tạo mã/thư mục triển khai trong `vulagent/` cho tới khi trọng tâm được chuyển (ghi vào [ROADMAP.md](ROADMAP.md)). Một ngoại lệ hợp lý: ghi chú nối hai phần đặt ở `notes/` của phần phát sinh và trỏ sang phần kia, không copy.
+**Quy tắc trọng tâm:** hai phần chạy song song; làm phần người dùng nêu trong yêu cầu, nếu không nêu thì theo "Việc tiếp theo" trong [ROADMAP.md](ROADMAP.md). Với VulAgent: không gọi API tốn phí khi nhóm chưa chốt key và ngân sách; làm hết phần ngoại tuyến trước. Một ngoại lệ hợp lý: ghi chú nối hai phần đặt ở `notes/` của phần phát sinh và trỏ sang phần kia, không copy.
 
 **S05 là phạm vi làm việc độc lập:** chọn kiến thức, challenge và CVE theo mức độ liên quan trực tiếp đến ret2libc. Mọi kết quả, offset, slide và bằng chứng phải được xác nhận cho chính S05; không lấy chủ đề seminar trước làm cơ sở chọn nội dung.
 
@@ -21,6 +21,7 @@ Nhóm 3 sinh viên, môn **NT521 – Lập trình khai thác lỗ hổng**. Hai 
 project_521/
 ├── AGENT.md            # file này – quy tắc xuyên suốt
 ├── CLAUDE.md           # trỏ tới AGENT.md để Claude Code tự nạp
+├── README.md           # tổng quan repo cho người đọc ngoài
 ├── ROADMAP.md          # kế hoạch tổng + trạng thái hiện tại + nhật ký
 ├── seminar_S05/        # PHẦN 1 – mini seminar đang làm
 │   ├── README.md       #   tổng quan, quyết định đã chốt
@@ -38,11 +39,19 @@ project_521/
 │   ├── PLAN.md         #   giai đoạn A–D, thực nghiệm, lịch
 │   ├── KNOWLEDGE.md    #   kiến thức cần học cho VulAgent
 │   ├── CHECKLIST.md
+│   ├── experiment_manifest.yaml  # khóa giao thức thực nghiệm, số liệu paper, shasum dữ liệu
+│   ├── .env.example    #   mẫu biến môi trường (không chứa key)
+│   ├── docs/           #   source_audit, reproduction_contract, reproduction_plan (C0–C5)
+│   ├── scripts/        #   metrics.py (sample + pair + VPS)
+│   ├── src/            #   schema.py (validator output); mã pipeline của nhóm
+│   ├── results/        #   tables/ (bảng tính lại được); raw/ (gitignore)
+│   ├── configs/ data/ tests/ slides/   # đã tạo, còn rỗng
+│   ├── upstream/       #   clone repo gốc HotFrom/VulAgent (gitignore; có key nhúng, không dùng, không commit)
 │   └── references/     #   tài liệu gốc của nhóm (prompt_nhom_3.md, kien_thuc_can_hoc.md)
 └── _archive/           # bản gốc đã tách; không sửa, không dùng làm nguồn chính
 ```
 
-Khi cần thư mục mới, đặt đúng phần của nó và cập nhật bản đồ này. Mã/dữ liệu VulAgent (`configs/`, `src/`, `scripts/`, `tests/`, `results/`, `experiment_manifest.yaml`…) tạo trong `vulagent/` theo mục 7 của [vulagent/references/prompt_nhom_3.md](vulagent/references/prompt_nhom_3.md) khi bắt đầu phần đó.
+Khi cần thư mục mới, đặt đúng phần của nó và cập nhật bản đồ này. Cấu trúc mã/dữ liệu VulAgent theo mục 7 của [vulagent/references/prompt_nhom_3.md](vulagent/references/prompt_nhom_3.md).
 
 Các thư mục sản phẩm `slides/`, `demo/`, `cve/`, `evidence/`, `notes/` của S05 tạo khi bắt đầu thực hiện phần tương ứng; bản đồ trên mô tả vị trí quy ước.
 

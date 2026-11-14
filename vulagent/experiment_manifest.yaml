@@ -1,0 +1,119 @@
+# experiment_manifest.yaml — khóa giao thức thực nghiệm VulAgent
+# Giai đoạn A. Ô [CHƯA CHỐT] phải điền trước khi chạy thật. KHÔNG ghi API key vào đây.
+# Trạng thái: cập nhật 2026-11-09 (paper_facts theo ACL + arXiv v1), chưa chạy thực nghiệm nào.
+
+paper:
+  primary: "VulAgent — Findings of ACL 2026, DOI 10.18653/v1/2026.findings-acl.928"
+  secondary: "arXiv:2509.11523 (v1, 15-09-2025)"
+  pdf_read: "ACL + arXiv (2026-11-09)"   # ACL PDF đọc qua markitdown 0.1.9; arXiv qua HTML. Định nghĩa metric lấy theo ACL.
+  acl_pdf_source: "https://aclanthology.org/2026.findings-acl.928.pdf"
+  arxiv_html_source: "https://arxiv.org/html/2509.11523v1"
+  title_variants:                # tên khác nhau giữa các bản — ghi để tránh nhầm
+    arxiv_abs: "VulAgent: Hypothesis-Validation based Multi-Agent Vulnerability Detection"
+    arxiv_html: "VulAgent: A Hypothesis Validation-Based Multi-Agent System for Software Vulnerability Detection"
+  authors: "Ziliang Wang, Ge Li, Jia Li, Hao Zhu, Zhi Jin"
+
+# ── Số liệu & định nghĩa từ paper (2026-11-09). Mức: verbatim trừ khi ghi 'summary'.
+# Định nghĩa metric + Table 1 lấy theo ACL 2026 (primary); các số còn lại (SVEN split, chi phí/mẫu, 304 cặp có context) từ arXiv v1 HTML.
+paper_facts:
+  primevul:
+    pairs: 435
+    conflict_in_paper: "Sec 3.1 gọi 435 cặp là 'validation set'; Sec 4.3 gọi là 'test set'. Mâu thuẫn NỘI TẠI trong paper — số 435 khớp file, nhưng tên split cần xác minh bản ACL."
+    context_available_pairs: 304   # summary Sec 4.3: 304/435 cặp có context
+  sven:
+    programs: 1606
+    pairs: 803
+    languages: "C/C++ và Python"   # xác nhận SEVEN gồm Python
+    split: "9:1 train/validation (KHÔNG phải 8:1:1; paper KHÔNG nêu test split)"
+    test_pairs_stated: "NOT STATED"  # paper không nêu số cặp test → file 83 cặp là tập đánh giá của nhóm/repo, không trích được từ paper
+  # ✅ ĐỊNH NGHĨA CHUẨN = bản ACL PDF (primary), đọc 2026-11-09 qua markitdown 0.1.9, Sec 4.2 verbatim:
+  metric_definitions_acl:
+    P_C: "percentage of function pairs where both functions are correctly classified (vulnerable as vulnerable, fixed as benign)"
+    P_R: "percentage of pairs where the two labels are predicted inversely (vulnerable predicted as benign while the fixed version is predicted as vulnerable)"
+    VPS: "VPS = P-C − P-R (net gain of correct over reversed pair-wise predictions)"
+  metric_definitions_arxiv_v1_IGNORE:   # bản tiền ấn phẩm, câu chữ KHÁC — KHÔNG dùng
+    P_R: "both functions are incorrectly classified as vulnerable (khác ACL — bỏ qua)"
+  pr_definition_resolved: "RESOLVED (2026-11-09): ACL = nhãn ĐẢO (vuln→benign & fixed→vuln). metrics.py dòng 190 KHỚP → KHÔNG sửa logic. Xem docs/source_audit.md §7.5"
+  backends_reported: ["GPT-4o (Table 1 chính)", "Qwen3-235B-A22-instruct", "DeepSeek v3.1", "GPT-3.5 (baseline)"]
+  inference_params_paper: "temperature 0, top_p 1, truy cập qua commercial API — khớp mã repo"
+  cost_per_sample_paper:          # verbatim — dùng ước tính ngân sách C1
+    avg_llm_calls: 8.83
+    avg_output_tokens: 7036.95
+  acl_table1_vulagent_gpt4o:      # ✅ VERBATIM bản ACL Table 1 (backend GPT-4o); VPS=P-C−P-R kiểm khớp
+    note: "số của VulAgent trên GPT-4o — MỐC tham chiếu lịch sử, KHÔNG phải số nhóm chạy. Nếu nhóm chạy Qwen3 → so dòng Qwen3 (Table 2/robustness, chưa trích verbatim)"
+    primevul: { P_C: 26.6, P_R: 10.1, VPS: 16.5, FPR: 36.7, F1: 56.2, ACC: 58.6 }
+    sven:     { P_C: 26.5, P_R: 6.02, VPS: 20.4, FPR: 55.4, F1: 65.6, ACC: 60.2 }
+
+upstream_repo:
+  url: "https://github.com/HotFrom/VulAgent"
+  commit: "065467c5130c25addb312da69d7238582c8c93b2"
+  clone_path: "vulagent/upstream/VulAgent"   # gitignore, không commit
+  license: "KHÔNG CÓ (thiếu LICENSE) — chưa rõ quyền tái phân phối"
+  entrypoint_recommended: "Quickly reproduce the experiment/VulAgent-Qwen.py"
+
+datasets:
+  primevul_test:
+    path: "upstream/VulAgent/Dataset/PrimeVul/primevul_test_paired.jsonl"
+    lines: 870
+    pairs: 435                   # 870/2 — khớp số paper (435)
+    pair_order: "xen kẽ liền kề: dòng chẵn(0-based)=vuln(target=1), dòng lẻ=fixed(target=0); cùng commit_url trong cặp. Ghép cặp THEO THỨ TỰ LIỀN KỀ (idx 2 vế KHÁC nhau → không ghép bằng idx)"
+    sha256: "82f443066dde5eb3fd07539dd811ef63344a2442f7abd242e9a86d62bfd8d885"
+  primevul_context:
+    path: "upstream/VulAgent/Dataset/PrimeVul_context/primevul_zh_format_complete.json"
+    lines: 10895
+    structure: "JSON list 419 phần tử; keys: code_context, commit_hash, cve_id, cwe_list, repository, short_hash, vulnerableMethods_before, vulnerableMethods_after"
+    label_leak_check: "AN TOÀN: hàm extract_code_context_from_primevul chỉ trả code_context (không trả vulnerableMethods_after=bản vá); và hàm này là DEAD CODE trong entrypoint Qwen (định nghĩa, không gọi). code_context KHÔNG chứa bản vá (đã kiểm substring). CẢNH BÁO: nếu nhóm tự dựng pipeline PrimeVul từ file này, chỉ lấy code_context, KHÔNG lấy *_after."
+    present: true
+    sha256: "7e1b7cbe42a009f4ab3146564b5b2496b4a528cb26bf4d480233be3a7786563b"
+  seven_test:
+    path: "upstream/VulAgent/Dataset/SEVEN/test_with_idx.jsonl"
+    lines: 166
+    pairs: 83                     # 166/2; xen kẽ vuln(1)/fixed(0) liền kề, idx liên tiếp (1,2/3,4…)
+    note: "paper KHÔNG nêu số cặp test (chỉ split 9:1 train/val) → 83 cặp là tập đánh giá của repo, không trích từ paper"
+    sha256: "48cb6f686db3ec8efe010932235ad706bf0b3016db7640b9b3dc567e573be362"
+  seven_context:
+    path: "upstream/VulAgent/Dataset/SEVEN_context/test_with_idx_context_cleaned.jsonl"
+    lines: 166
+    context_structure: "trường context = dict {imports, callee_funcs} (mã hàm phụ trợ liên thủ tục); 164/166 có imports+callee_funcs, 2/166 có key 'error'"
+    label_leak_check: "AN TOÀN: quét toàn bộ 166 dòng, 0 dòng chứa nhãn/bản fixed trong context"
+    note: "giống hệt file trong 'Quickly reproduce the experiment' (cùng byte)"
+    sha256: "89e24ba42f5f45510710f89651fdf51c2875b07a7ff77c3ff50c3b805ec563c4"
+  input_schema: [func_name, func, file_name, commit_url, cwe, target, idx, proj, context]
+  label_field: "target"         # nhãn nằm trong input; đã xác nhận KHÔNG lọt vào prompt (C0.1)
+  pair_key_sample: "idx (map pred↔gt sample-level)"
+  pair_key_pairing: "thứ tự dòng liền kề (KHÔNG dùng idx cho PrimeVul)"
+  language_observed: "SEVEN = C/C++ và Python (paper xác nhận cả hai; mẫu test quan sát là Python)"
+
+model:
+  provider: "Alibaba DashScope (OpenAI-compatible mode)"
+  base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  name: "qwen3-235b-a22b-instruct-2507"
+  api_key_env: "DASHSCOPE_API_KEY"   # đọc từ môi trường, KHÔNG nhúng
+  baseline_gpt4o:
+    note: "các file *-GPT4O.py dùng base_url/key rỗng — điền endpoint+key riêng khi chạy baseline"
+
+inference_params:        # đọc trực tiếp từ VulAgent-Qwen.py
+  temperature: 0.0
+  top_p: 1.0
+  max_tokens: 4096
+  extra_body: { enable_thinking: false }
+  verified_api_supports: "[CHƯA CHỐT: xác minh DashScope nhận đủ tham số]"
+
+run_control:
+  runs: 1                 # paper mô tả 3 lượt cho chạy full; nháp để 1, ghi rõ khi báo
+  concurrency: "[CHƯA CHỐT: MAX_WORKERS/BATCH_SIZE trong script]"
+  seed: null             # script không đặt seed
+  prompt_templates: "upstream/VulAgent/Quickly reproduce the experiment/prompt_template/ (15 file .txt)"
+  prompt_hash: "[CHƯA CHỐT: chạy sha256 lên thư mục prompt_template]"
+
+cost:
+  budget: "[CHƯA CHỐT: NGÂN_SÁCH_API]"
+  estimate_local: "[CHƯA CHỐT: ước tính sau dry-run 1 mẫu (C1) trên máy nhóm]"
+  paper_reference: "Sec 3.2: trung bình 8.83 lời gọi LLM và 7036.95 token output / mẫu. Sơ bộ: SEVEN 166 mẫu ≈ 1466 lời gọi & ~1.17M token output; PrimeVul 870 mẫu ≈ 7682 lời gọi & ~6.12M token output (×1 lượt, CHƯA tính token input). Dùng để ước ngân sách, xác nhận lại bằng dry-run C1."
+
+environment:
+  dev_machine: "Mac Apple Silicon (arm64)"
+  python_local: "3.14.6 (yêu cầu repo: >=3.8) — dùng .venv riêng, pin openai"
+  docker: "29.6.1, daemon đang chạy (dự phòng cho Joern nếu cần CPG)"
+  deps_pin: "openai>=1.40,<2.0   # chốt phiên bản CHÍNH XÁC bằng `pip freeze` khi tạo .venv (C1); mã repo dùng OpenAI() + chat.completions + extra_body → cần openai 1.x"
+  metrics_py_deps: "chỉ thư viện chuẩn (không cần cài gì) — scripts/metrics.py chạy offline"

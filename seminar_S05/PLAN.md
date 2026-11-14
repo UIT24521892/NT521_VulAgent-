@@ -11,7 +11,7 @@ Cập nhật: **2026-10-19**. Yêu cầu chuẩn: [REQUIREMENTS.md](REQUIREMENTS
 3. [ ] Chuẩn bị challenge **ROP Emporium `split` x86_64** trên Kali amd64/UTM đã có; xác nhận kiến trúc, checksum, loader và libc thực tế.
 4. [ ] Đo offset và kiểm tra NX/canary/PIE/RELRO của chính `split`; ghi trạng thái ASLR khi chạy ngoài GDB và thiết lập randomization trong GDB.
 5. [ ] Phân tích đường gọi `system()` qua PLT và quy ước truyền tham số; lưu bằng chứng mới cho S05.
-6. [ ] Chuẩn bị phần trình bày CVE-1999-0032 theo [ghi chú riêng S05](cve/CVE-1999-0032.md); sau đó soạn slide và diễn tập.
+6. [x] Chuẩn bị phần CVE: ca chính [CVE-2018-5767](cve/CVE-2018-5767.md) (Tenda AC15, ret2libc trên ARM, NX bật, RCE 9.8) + bước đệm [CVE-1999-0032](cve/CVE-1999-0032.md) (~1 slide). Còn lại: soạn slide và diễn tập.
 
 Các mục 3–6 là **công việc sắp làm**. Phiên đổi kế hoạch chưa tải/chạy challenge, chưa đo offset, chưa tạo slide hoặc ảnh S05.
 
@@ -47,10 +47,10 @@ Chi tiết thứ tự học: [KNOWLEDGE.md](KNOWLEDGE.md).
 |---|---|---|
 | 1. Giới thiệu và bối cảnh | Tái sử dụng mã thư viện trong chương trình C/C++; bối cảnh stack NX và lỗi bộ nhớ có thể làm đổi luồng | Sơ đồ vùng dữ liệu stack và vùng mã thư viện; mục tiêu demo |
 | 2. Nguyên lý và điều kiện | Ghi tới dữ liệu điều khiển; địa chỉ hàm hợp lệ; đối số đúng ABI; stack alignment; đường tiếp tục | So sánh chèn mã, gọi libc qua PLT và nhảy trực tiếp vào libc |
-| 3. CWE và quan hệ với chủ đề | CWE-121 cho lỗi stack buffer của ca demo nếu được phân tích xác nhận; liên hệ CWE-787. Ret2libc không phải tên của lỗi gốc | Đánh dấu vùng ghi ngoài biên và giải thích lỗi nền → kỹ thuật khai thác |
+| 3. CWE và quan hệ với chủ đề | Lỗi nền của cả hai ca CVE và demo là CWE-121 (stack buffer overflow); liên hệ CWE-120/CWE-787. NVD gán khác nhau (1999: NVD-CWE-Other; 2018: CWE-20) → nói rõ nhãn NVD vs phân loại của nhóm. Ret2libc không phải tên của lỗi gốc | Đánh dấu vùng ghi ngoài biên và giải thích lỗi nền → kỹ thuật khai thác |
 | 4. Vị trí và nguyên nhân | Theo dấu input tới sink; dung lượng vùng đệm, giới hạn đọc/ghi, guard; đường liên kết tới hàm thư viện | Source/disassembly của binary S05, offset đo lại và bản đồ vùng nhớ |
 | 5. Chuỗi khai thác | Input → ghi vượt → thay đổi địa chỉ trả về → chuẩn bị đối số → gọi hàm thư viện → quan sát kết quả | Sơ đồ bám đúng demo; debugger cho thấy tới hàm thư viện với đối số đúng |
-| 6. CVE thực tế | CVE-1999-0032: lỗi `lpr`, điều kiện cục bộ, tác động và khắc phục; đối chiếu công bố return-into-libc | Hai slide; phân biệt bằng chứng từ hồ sơ CVE, advisory và công bố kỹ thuật |
+| 6. CVE thực tế | **Chính: CVE-2018-5767 (Tenda AC15)** — `sscanf` chép Cookie `password=` vào buffer stack trong `R7WebsSecurityHandler`, NX bật, ARM đặt đối số qua `r0` bằng gadget, RCE từ xa 9.8. **Bước đệm: CVE-1999-0032 (lpr)** ~1 slide, nơi ret2libc ra đời | 1 slide 1999 (5 ý ở khung "Khi trình bày") + 2 slide 2018; phân biệt rõ nguồn và mức bằng chứng |
 | 7. Demo Pwnable | `split` x86_64 trong VM cô lập; input thường, phân tích lỗi, gọi `system()` theo mục tiêu CTF | Log/ảnh riêng S05, trạng thái NX thực tế, kết quả challenge và ít nhất hai lần chạy liên tiếp |
 | 8. Khắc phục và bảo vệ | Sửa giới hạn ghi, kiểm tra độ dài/kết quả; so sánh NX/canary/ASLR/PIE/RELRO; ASan khi kiểm thử mã có source | Mã lỗi/sửa; bảng mỗi cơ chế tác động ở bước nào và giới hạn |
 | 9. Điều kiện và giới hạn | Kiến trúc, ABI, libc/loader, trạng thái randomization, độ kiểm soát input, các bảo vệ đã đo | Bảng đã xác nhận/chưa xác nhận; phân biệt kết quả trong GDB và ngoài GDB |
@@ -66,11 +66,17 @@ Chi tiết thứ tự học: [KNOWLEDGE.md](KNOWLEDGE.md).
 
 **Nhánh thực hành direct ret2libc:** xem module [pwn.college — Pwndamentals](https://pwn.college/pwndamentals~cfe9c1cb/return-oriented-programming/) có bài “Return to libc” theo nguồn đã kiểm tra ngày 2026-10-19. Trước khi chọn phải xác nhận quyền truy cập, kiến trúc và điều kiện chạy; không mặc định tải được về Kali. Đầu ra cần bổ sung: bản libc đúng, cách biết địa chỉ runtime, điểm vào trực tiếp trong vùng mã libc và giới hạn khi ASLR bật. Thông tin debugger cung cấp để học phải được ghi là giả định của lab, không phải khả năng tự rò rỉ địa chỉ của exploit. Có thể học thêm bằng [SEED Return-to-libc Attack Lab](https://seedsecuritylabs.org/Labs_20.04/Software/Return_to_Libc/); đây là lab học tập, không thay thế yêu cầu CTF, và môi trường được tác giả kiểm thử là SEED Ubuntu 20.04.
 
-### CVE được chọn: CVE-1999-0032 trong lpr
+### CVE: ca chính CVE-2018-5767, bước đệm CVE-1999-0032
 
-Chuẩn bị theo [cve/CVE-1999-0032.md](cve/CVE-1999-0032.md). Nguồn gồm hồ sơ NVD, advisory FreeBSD và công bố gốc return-into-libc. Ghi chú đã tách rõ phát biểu của từng nguồn và cách đối chiếu lỗi với kỹ thuật khai thác.
+**Cấu trúc chốt 2026-11-02 (ba bước nối liền mạch):**
 
-Phần trình bày phải có sản phẩm, nguyên nhân, input, điều kiện, tác động, phạm vi bản vá và mối liên hệ với ret2libc. Chỉ nghiên cứu CVE; demo thực hành là challenge CTF riêng. Không suy ra khả năng vượt mọi bảo vệ hiện đại từ một ca lịch sử.
+1. **Bước đệm — CVE-1999-0032 (lpr), ~1 slide 1,5–2 phút.** Chuẩn bị theo [cve/CVE-1999-0032.md](cve/CVE-1999-0032.md), đặc biệt khung "Khi trình bày" giữ đủ 5 ý: lỗi ở `card()`, setuid root → leo quyền, Solar Designer 1997 khai sinh return-into-libc, ràng buộc byte 0, nhãn CWE. Nói sơ nhưng **không cụt**: đây là nơi kỹ thuật ra đời và là dạng đơn giản nhất (đối số trên stack).
+2. **Demo `split` x86_64** (mục 7) — xem tận mắt kỹ thuật: gadget `pop rdi; ret` đặt đối số vào RDI rồi gọi `system`.
+3. **Ca chính — CVE-2018-5767 (Tenda AC15), 2 slide ~3–4 phút.** Chuẩn bị theo [cve/CVE-2018-5767.md](cve/CVE-2018-5767.md). Lỗi `sscanf` chép Cookie `password=` vào buffer stack trong hàm `R7WebsSecurityHandler`; NX bật; ARM truyền đối số qua `r0` nên cần gadget — **cùng hình dạng với demo**; gadget chứa byte null chỉ dùng một lần — **lặp lại ràng buộc byte 0 của 1997**. Kết quả: RCE từ xa, không xác thực, CVSS 9.8.
+
+**Thông điệp xuyên suốt:** cùng lớp lỗi (CWE-121) và cùng kỹ thuật "gadget đặt đối số vào thanh ghi rồi gọi hàm libc", kéo dài 1996 → 2018, chỉ đổi kiến trúc và chuyển từ cục bộ sang từ xa.
+
+Phần trình bày mỗi CVE phải có sản phẩm, nguyên nhân, input, điều kiện, tác động, phạm vi khắc phục và mối liên hệ với ret2libc. **Chỉ nghiên cứu CVE; không tái hiện khai thác** (nhất là firmware Tenda thật — AGENT.md cấm). Demo thực hành là challenge CTF `split` riêng. Không suy ra khả năng vượt mọi bảo vệ hiện đại từ hai ca này.
 
 ## 5. Kịch bản demo và bằng chứng cần thu
 
@@ -98,7 +104,8 @@ Dự phòng: bộ ảnh và log từ lần chạy thật, kèm video nếu có. 
 | 2 | Ôn buffer overflow, saved return address và CWE | 2 |
 | 3 | NX và ý tưởng return-to-libc | 1,5 |
 | 4 | ABI; phân biệt ret2plt, direct ret2libc và ROP | 1,5 |
-| 5–6 | CVE: nguyên nhân, điều kiện, tác động, bản vá, giới hạn liên hệ | 4 |
+| 5 | **Bước đệm CVE-1999-0032 (lpr):** lỗi `card()`, setuid root, khai sinh ret2libc 1997, ràng buộc byte 0 | 1,5 |
+| 6 | **Ca chính CVE-2018-5767 (Tenda AC15):** `sscanf`/Cookie, NX bật, gadget đặt `r0`, RCE 9.8; nối về demo và về 1997 | 3 |
 | 7 | Môi trường challenge và bảo vệ đã đo | 1 |
 | 8 | Sink, vùng đệm, offset và điều kiện chiếm luồng | 2 |
 | 9 | Sơ đồ gọi hàm thư viện và truyền đối số | 2 |
@@ -107,7 +114,7 @@ Dự phòng: bộ ảnh và log từ lần chạy thật, kèm video nếu có. 
 | 12 | Sửa lỗi và bảng các cơ chế bảo vệ | 2 |
 | 13 | Điều kiện, giới hạn và kết luận | 2 |
 | 14 | Nguồn tham khảo và hỏi đáp | 2 |
-| **Tổng** | **Gồm hỏi đáp** | **26** |
+| **Tổng** | **Gồm hỏi đáp** | **26,5** |
 
 Nếu chỉ có 20 phút: nền 4, CVE 3, phân tích/demo 8, sửa lỗi/kết luận 3, hỏi đáp 2. Giữ đủ 10 mục, rút phần mở rộng.
 

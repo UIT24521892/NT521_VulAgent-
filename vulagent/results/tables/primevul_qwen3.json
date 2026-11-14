@@ -1,0 +1,46 @@
+{
+  "sample_level": {
+    "TP": 253,
+    "FP": 188,
+    "FN": 182,
+    "TN": 245,
+    "evaluated": 868,
+    "precision": 0.5736961451247166,
+    "recall": 0.5816091954022988,
+    "f1": 0.5776255707762558,
+    "accuracy": 0.5737327188940092,
+    "fpr": 0.4341801385681293,
+    "fnr": 0.41839080459770117
+  },
+  "pair_level": {
+    "skip": {
+      "pairs_total": 435,
+      "pairs_evaluated": 435,
+      "pairs_missing": 0,
+      "P_C": 112,
+      "P_R": 48,
+      "both_vulnerable": 141,
+      "both_benign": 134,
+      "P_C_ratio": 0.2574712643678161,
+      "P_R_ratio": 0.1103448275862069,
+      "VPS": 0.1471264367816092
+    },
+    "count_wrong": {
+      "pairs_total": 435,
+      "pairs_evaluated": 435,
+      "pairs_missing": 0,
+      "P_C": 112,
+      "P_R": 48,
+      "both_vulnerable": 141,
+      "both_benign": 134,
+      "P_C_ratio": 0.2574712643678161,
+      "P_R_ratio": 0.1103448275862069,
+      "VPS": 0.1471264367816092
+    }
+  },
+  "coverage": 1.0,
+  "warnings": [
+    "Ground-truth có 2 idx trùng (0 trái nhãn): [349259, 439495] — sample-level chỉ chấm theo idx duy nhất.",
+    "Dự đoán có 2 idx trùng (1 TRÁI kết luận, bản sau ghi đè): [349259, 439495] — nguồn dự đoán không sạch, kiểm tra lại."
+  ]
+}
