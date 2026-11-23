@@ -8,10 +8,10 @@ Nhóm 3 sinh viên, môn **NT521 – Lập trình khai thác lỗ hổng**. Hai 
 
 | Phần | Thư mục | Sản phẩm | Trạng thái |
 |---|---|---|---|
-| Mini seminar **S05 – Return-to-libc (ret2libc)** | [seminar_S05/](seminar_S05/) | Slide 12–14 trang + demo CTF + CVE, 20–30 phút | **ĐANG LÀM (đổi chủ đề ngày 2026-10-19)** |
-| Đề tài **VulAgent** – phát hiện lỗ hổng bằng lập và kiểm chứng giả thuyết | [vulagent/](vulagent/) | Mã pipeline, dữ liệu đánh giá, báo cáo, slide | **ĐÃ KÍCH HOẠT 2026-11-06**: xong Giai đoạn A + C0 + pipeline của nhóm chạy offline bằng phát lại (2026-11-15); chưa gọi LLM |
+| Mini seminar **S05 – Return-to-libc (ret2libc)** | [seminar_S05/](seminar_S05/) | Slide 12–14 trang + demo CTF + CVE, 20–30 phút | **TẠM DỪNG (2026-11-23)**: demo `split` ra flag (lần 1) + nội dung 10 mục đã có; còn demo lần 2 + ảnh evidence + file slide. Dừng theo yêu cầu người dùng để dồn sức VulAgent |
+| Đề tài **VulAgent** – phát hiện lỗ hổng bằng lập và kiểm chứng giả thuyết | [vulagent/](vulagent/) | Mã pipeline, dữ liệu đánh giá, báo cáo, slide | **🎯 TRỌNG TÂM HIỆN TẠI (2026-11-23)**: xong Giai đoạn A + C0 + pipeline của nhóm chạy offline bằng phát lại (2026-11-15); chưa gọi LLM (C1 trở đi chờ nhóm chốt key DashScope + ngân sách + hạn) |
 
-**Quy tắc trọng tâm:** hai phần chạy song song; làm phần người dùng nêu trong yêu cầu, nếu không nêu thì theo "Việc tiếp theo" trong [ROADMAP.md](ROADMAP.md). Với VulAgent: không gọi API tốn phí khi nhóm chưa chốt key và ngân sách; làm hết phần ngoại tuyến trước. Một ngoại lệ hợp lý: ghi chú nối hai phần đặt ở `notes/` của phần phát sinh và trỏ sang phần kia, không copy.
+**Quy tắc trọng tâm:** **Từ 2026-11-23, trọng tâm là VulAgent; S05 tạm dừng** theo yêu cầu người dùng (quyết định này thay cho mặc định "hai phần song song"). Làm phần người dùng nêu trong yêu cầu, nếu không nêu thì theo "Việc tiếp theo" trong [ROADMAP.md](ROADMAP.md) (hiện là VulAgent). Với VulAgent: không gọi API tốn phí khi nhóm chưa chốt key và ngân sách; làm hết phần ngoại tuyến trước. Một ngoại lệ hợp lý: ghi chú nối hai phần đặt ở `notes/` của phần phát sinh và trỏ sang phần kia, không copy.
 
 **S05 là phạm vi làm việc độc lập:** chọn kiến thức, challenge và CVE theo mức độ liên quan trực tiếp đến ret2libc. Mọi kết quả, offset, slide và bằng chứng phải được xác nhận cho chính S05; không lấy chủ đề seminar trước làm cơ sở chọn nội dung.
 
