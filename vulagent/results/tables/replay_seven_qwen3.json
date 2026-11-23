@@ -1,0 +1,76 @@
+{
+  "sample_level": {
+    "TP": 40,
+    "FP": 24,
+    "FN": 28,
+    "TN": 45,
+    "evaluated": 137,
+    "precision": 0.625,
+    "recall": 0.5882352941176471,
+    "f1": 0.6060606060606061,
+    "accuracy": 0.6204379562043796,
+    "fpr": 0.34782608695652173,
+    "fnr": 0.4117647058823529
+  },
+  "pair_level": {
+    "skip": {
+      "pairs_total": 83,
+      "pairs_evaluated": 61,
+      "pairs_missing": 22,
+      "P_C": 20,
+      "P_R": 3,
+      "both_vulnerable": 15,
+      "both_benign": 23,
+      "P_C_ratio": 0.32786885245901637,
+      "P_R_ratio": 0.04918032786885246,
+      "VPS": 0.2786885245901639
+    },
+    "count_wrong": {
+      "pairs_total": 83,
+      "pairs_evaluated": 83,
+      "pairs_missing": 22,
+      "P_C": 20,
+      "P_R": 3,
+      "both_vulnerable": 15,
+      "both_benign": 23,
+      "P_C_ratio": 0.24096385542168675,
+      "P_R_ratio": 0.03614457831325301,
+      "VPS": 0.20481927710843373
+    }
+  },
+  "coverage": 0.8253012048192772,
+  "warnings": [
+    "29 mẫu có decision='unknown' (lỗi LLM/parse), không có dự đoán: [61, 91, 92, 105, 106, 107, 111, 112, 114, 115] — không tính vào sample-level; cặp chứa mẫu này là 'thiếu'."
+  ],
+  "unknown_idx": [
+    61,
+    91,
+    92,
+    105,
+    106,
+    107,
+    111,
+    112,
+    114,
+    115,
+    116,
+    117,
+    123,
+    124,
+    126,
+    127,
+    130,
+    132,
+    137,
+    146,
+    147,
+    153,
+    156,
+    157,
+    158,
+    159,
+    160,
+    161,
+    166
+  ]
+}

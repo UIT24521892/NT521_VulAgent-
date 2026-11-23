@@ -1,6 +1,6 @@
 # experiment_manifest.yaml — khóa giao thức thực nghiệm VulAgent
 # Giai đoạn A. Ô [CHƯA CHỐT] phải điền trước khi chạy thật. KHÔNG ghi API key vào đây.
-# Trạng thái: cập nhật 2026-11-09 (paper_facts theo ACL + arXiv v1), chưa chạy thực nghiệm nào.
+# Trạng thái: cập nhật 2026-11-15 (paper_facts theo ACL + arXiv v1; thêm số đo từ PHÁT LẠI output công bố). Chưa gọi LLM lần nào.
 
 paper:
   primary: "VulAgent — Findings of ACL 2026, DOI 10.18653/v1/2026.findings-acl.928"
@@ -104,11 +104,12 @@ run_control:
   concurrency: "[CHƯA CHỐT: MAX_WORKERS/BATCH_SIZE trong script]"
   seed: null             # script không đặt seed
   prompt_templates: "upstream/VulAgent/Quickly reproduce the experiment/prompt_template/ (15 file .txt)"
-  prompt_hash: "[CHƯA CHỐT: chạy sha256 lên thư mục prompt_template]"
+  prompt_hash: "2763aca80df1362565a309211d5b32f6ab5e5d6863be67aa7ce8d6b94e67f9bf"   # sha256 của danh sách '<agent>:<sha256 file>' xếp theo tên, 15 file; từng file ở run_meta.json::prompt_sha256 (đo 2026-11-15)
 
 cost:
   budget: "[CHƯA CHỐT: NGÂN_SÁCH_API]"
   estimate_local: "[CHƯA CHỐT: ước tính sau dry-run 1 mẫu (C1) trên máy nhóm]"
+  replay_measured: "Đo 2026-11-15 bằng scripts/run_pipeline.py --backend replay trên output Qwen3 công bố (KHÔNG phải nhóm chạy model): SEVEN 166 mẫu = 1391 lời gọi (8.38/mẫu), TB 83.6k ký tự prompt và 19.3k ký tự output mỗi mẫu; PrimeVul 850 mẫu = 7670 lời gọi (9.02/mẫu), TB 114.9k ký tự prompt và 27.9k ký tự output mỗi mẫu. Đơn vị là KÝ TỰ, chưa quy ra token. Lưu ý ngân sách: lượng input lớn gấp ~4 lần output, trong khi số của paper chỉ tính token output."
   paper_reference: "Sec 3.2: trung bình 8.83 lời gọi LLM và 7036.95 token output / mẫu. Sơ bộ: SEVEN 166 mẫu ≈ 1466 lời gọi & ~1.17M token output; PrimeVul 870 mẫu ≈ 7682 lời gọi & ~6.12M token output (×1 lượt, CHƯA tính token input). Dùng để ước ngân sách, xác nhận lại bằng dry-run C1."
 
 environment:

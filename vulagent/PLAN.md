@@ -1,6 +1,6 @@
 # Kế hoạch VulAgent
 
-Nguồn: tách từ [../_archive/Huong_dan_hoc_va_thuc_hien_S01_VulAgent.md](../_archive/Huong_dan_hoc_va_thuc_hien_S01_VulAgent.md) (mục 4–6) và đặc tả chi tiết ở [references/prompt_nhom_3.md](references/prompt_nhom_3.md). **Đã kích hoạt 2026-11-06** (xong Giai đoạn A + C0 offline; chi tiết Giai đoạn C ở [docs/reproduction_plan.md](docs/reproduction_plan.md)) — trạng thái hiện tại xem [../ROADMAP.md](../ROADMAP.md).
+Nguồn: tách từ [../_archive/Huong_dan_hoc_va_thuc_hien_S01_VulAgent.md](../_archive/Huong_dan_hoc_va_thuc_hien_S01_VulAgent.md) (mục 4–6) và đặc tả chi tiết ở [references/prompt_nhom_3.md](references/prompt_nhom_3.md). **Đã kích hoạt 2026-11-06** (xong Giai đoạn A + C0 offline; Giai đoạn B đã có pipeline của nhóm chạy bằng phát lại output công bố từ 2026-11-15, chưa gọi LLM; chi tiết Giai đoạn C ở [docs/reproduction_plan.md](docs/reproduction_plan.md)) — trạng thái hiện tại xem [../ROADMAP.md](../ROADMAP.md).
 
 ## 1. Đọc paper để hiểu phương pháp
 

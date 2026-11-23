@@ -1,0 +1,56 @@
+{
+  "sample_level": {
+    "TP": 253,
+    "FP": 186,
+    "FN": 168,
+    "TN": 234,
+    "evaluated": 841,
+    "precision": 0.5763097949886105,
+    "recall": 0.6009501187648456,
+    "f1": 0.5883720930232558,
+    "accuracy": 0.5790725326991677,
+    "fpr": 0.44285714285714284,
+    "fnr": 0.3990498812351544
+  },
+  "pair_level": {
+    "skip": {
+      "pairs_total": 435,
+      "pairs_evaluated": 418,
+      "pairs_missing": 17,
+      "P_C": 110,
+      "P_R": 46,
+      "both_vulnerable": 140,
+      "both_benign": 122,
+      "P_C_ratio": 0.2631578947368421,
+      "P_R_ratio": 0.11004784688995216,
+      "VPS": 0.15311004784688992
+    },
+    "count_wrong": {
+      "pairs_total": 435,
+      "pairs_evaluated": 435,
+      "pairs_missing": 17,
+      "P_C": 110,
+      "P_R": 46,
+      "both_vulnerable": 140,
+      "both_benign": 122,
+      "P_C_ratio": 0.25287356321839083,
+      "P_R_ratio": 0.10574712643678161,
+      "VPS": 0.14712643678160922
+    }
+  },
+  "coverage": 0.9689655172413794,
+  "warnings": [
+    "7 mẫu có decision='unknown' (lỗi LLM/parse), không có dự đoán: [195670, 196578, 211785, 212407, 230147, 247337, 253699] — không tính vào sample-level; cặp chứa mẫu này là 'thiếu'.",
+    "Ground-truth có 2 idx trùng (0 trái nhãn): [349259, 439495] — sample-level chỉ chấm theo idx duy nhất.",
+    "Dự đoán có 2 idx trùng (0 TRÁI kết luận, bản sau ghi đè): [349259, 439495] — nguồn dự đoán không sạch, kiểm tra lại."
+  ],
+  "unknown_idx": [
+    195670,
+    196578,
+    211785,
+    212407,
+    230147,
+    247337,
+    253699
+  ]
+}

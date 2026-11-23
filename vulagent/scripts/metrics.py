@@ -72,9 +72,11 @@ def read_ground_truth(path: Path):
 # ───────── Đọc dự đoán ─────────
 def read_predictions_file(path: Path):
     """Đọc file kiểu results.txt: mỗi dòng 'idx<sep>pred' (sep = tab/phẩy/cách)
-    hoặc JSON {'idx':..,'pred':..}. Trả về (preds, bad_lines, dups);
-    dups = danh sách (idx, trái_kết_luận) cho idx lặp lại (bản sau ghi đè bản trước)."""
-    preds, bad, dups = {}, 0, []
+    hoặc JSON {'idx':..,'pred':..}. Trả về (preds, bad_lines, dups, unknown);
+    dups = danh sách (idx, trái_kết_luận) cho idx lặp lại (bản sau ghi đè bản trước);
+    unknown = idx mà pipeline của nhóm ghi decision='unknown' (pred=null): KHÔNG có
+    dự đoán, không tính là benign — sample-level bỏ qua, pair-level coi là thiếu."""
+    preds, bad, dups, unknown = {}, 0, [], []
 
     def put(idx, pred):
         if idx in preds:
@@ -94,6 +96,9 @@ def read_predictions_file(path: Path):
                 try:
                     obj = json.loads(ln)
                     idx = int(obj.get("idx"))
+                    if obj.get("pred") is None and obj.get("decision") == "unknown":
+                        unknown.append(idx)
+                        continue
                     pred = int(obj.get("pred"))
                     if pred in (0, 1):
                         put(idx, pred)
@@ -101,7 +106,7 @@ def read_predictions_file(path: Path):
                 except (json.JSONDecodeError, TypeError, ValueError):
                     pass
             bad += 1
-    return preds, bad, dups
+    return preds, bad, dups, unknown
 
 
 def read_predictions_dir(path: Path, pred_key: str):
@@ -242,11 +247,13 @@ def print_report(sm, pm, coverage, warns):
             print(f"  ⚠ {w}")
 
 
-def write_outputs(out_prefix, sm, pm, coverage, pairs, preds, gt, warns):
+def write_outputs(out_prefix, sm, pm, coverage, pairs, preds, gt, warns, unknown=None):
     out_prefix = Path(out_prefix)
     out_prefix.parent.mkdir(parents=True, exist_ok=True)
     summary = {"sample_level": sm, "pair_level": pm,
                "coverage": coverage, "warnings": warns}
+    if unknown is not None:
+        summary["unknown_idx"] = sorted(unknown)
     (out_prefix.with_suffix(".json")).write_text(
         json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
     with out_prefix.with_suffix(".pairs.csv").open("w", newline="", encoding="utf-8") as f:
@@ -318,12 +325,16 @@ def main():
         ap.error("Cần --gt và (--pred hoặc --pred-dir). Hoặc dùng --selftest.")
 
     gt, order, gt_dups = read_ground_truth(args.gt)
+    unknown = []
     if args.pred:
-        preds, bad, pred_dups = read_predictions_file(args.pred)
+        preds, bad, pred_dups, unknown = read_predictions_file(args.pred)
     else:
         preds, bad, pred_dups = read_predictions_dir(args.pred_dir, args.pred_key)
 
     warns = []
+    if unknown:
+        warns.append(f"{len(unknown)} mẫu có decision='unknown' (lỗi LLM/parse), không có dự đoán: "
+                     f"{sorted(unknown)[:10]} — không tính vào sample-level; cặp chứa mẫu này là 'thiếu'.")
     if gt_dups:
         conflict = sum(1 for _, c in gt_dups if c)
         warns.append(f"Ground-truth có {len(gt_dups)} idx trùng ({conflict} trái nhãn): "
@@ -346,7 +357,7 @@ def main():
     pm = pair_metrics(pairs, preds, gt)
 
     print_report(sm, pm, coverage, warns)
-    write_outputs(args.out, sm, pm, coverage, pairs, preds, gt, warns)
+    write_outputs(args.out, sm, pm, coverage, pairs, preds, gt, warns, unknown if args.pred else None)
 
 
 if __name__ == "__main__":

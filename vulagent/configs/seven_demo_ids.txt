@@ -1,0 +1,3 @@
+# Cặp demo M2/R4 trên SEVEN (dòng 71–72 của test_with_idx_context_cleaned.jsonl): idx 71 = vulnerable, 72 = fixed.
+71
+72

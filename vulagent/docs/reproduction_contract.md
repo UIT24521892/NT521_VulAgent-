@@ -9,7 +9,7 @@ Ngày: 2026-11-06. Mục đích: nói rõ mức nào là "tái hiện", mức n�
 | **R1 — Tái hiện đúng cấu hình** | Chạy đúng model/dữ liệu/tham số/split của paper, báo ACC/P/R/F1/FPR/P-C/P-R/VPS trên **toàn** tập test | Key DashScope + ngân sách đủ 435 cặp PrimeVul (×3 lượt) và/hoặc SEVEN; prompt + metric đã đối chiếu paper | ❌ chưa (thiếu key/ngân sách; metric đã đối chiếu ACL 2026-11-09) |
 | **R2 — Tái hiện có thay thế khai báo** | Như R1 nhưng đổi backend (vd Qwen thay GPT-4o), 1 lượt thay 3, hoặc tập con có quy tắc lấy mẫu công khai; ghi rõ mọi thay thế | Key + ngân sách vừa phải | ❌ chưa |
 | **R3 — Thí nghiệm thu nhỏ** | Chạy một tập con nhỏ cố định theo ID (vd 10–20 cặp), đủ để tính bảng metric tính-lại-được, nêu rõ là mẫu nhỏ | Key + ngân sách tối thiểu | ❌ chưa — **mục tiêu khả thi đầu tiên khi có key** |
-| **R4 — Demo thủ công** | Chạy pipeline trên **một** cặp vulnerable/fixed, lưu trace từng agent (candidate → giả thuyết → kiểm điều kiện → quyết định) | Key cho ~vài chục lời gọi LLM | ❌ chưa — **mốc M2 của PLAN** |
+| **R4 — Demo thủ công** | Chạy pipeline trên **một** cặp vulnerable/fixed, lưu trace từng agent (candidate → giả thuyết → kiểm điều kiện → quyết định) | Key cho ~vài chục lời gọi LLM | ⚠️ một nửa (2026-11-15): pipeline nhóm đã chạy cặp SEVEN idx 71/72 bằng **phát lại output công bố**, có trace đọc được; **chưa** chạy bằng model của nhóm — **mốc M2 của PLAN** |
 
 "Chạy ra một ví dụ" = R4 = demo, **không** phải tái hiện (khớp tiêu chí chấm: demo ≠ tái hiện toàn bộ).
 
@@ -20,7 +20,8 @@ Ngày: 2026-11-06. Mục đích: nói rõ mức nào là "tái hiện", mức n�
 - [x] (C0.2) Đọc `evaluate.py` → viết lại script metric độc lập trong `vulagent/scripts/`, kiểm bằng tay trên bảng TP/FP/TN/FN nhỏ (không cần LLM).
 - [x] (C0.3) Viết parser + validator JSON schema đầu ra trong `vulagent/src/` (không cần LLM; test bằng các file `*_full.json` có sẵn trong repo gốc làm fixture).
 - [x] (C0.4) Đối chiếu paper (ACL PDF + arXiv v1 HTML), điền `paper_facts` trong manifest và [source_audit §7.5](source_audit.md).
-- [ ] Chuẩn hóa tập con cố định theo ID cho R3/R4 (chọn vài cặp, lưu danh sách ID).
+- [x] (2026-11-15) Tập con cố định theo ID: `configs/seven_demo_ids.txt` (R4), `configs/seven_r3_ids.txt` (R3, 20 cặp đầu).
+- [x] (2026-11-15) Pipeline của nhóm + test + phát lại output công bố ([reproduction_plan mục B](reproduction_plan.md)).
 
 Theo PLAN: "nếu thiếu API/chi phí, hoàn thành toàn bộ phần ngoại tuyến rồi mới hỏi quyền còn thiếu".
 

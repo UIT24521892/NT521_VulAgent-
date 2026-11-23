@@ -1,0 +1,44 @@
+{
+  "sample_level": {
+    "TP": 40,
+    "FP": 24,
+    "FN": 43,
+    "TN": 59,
+    "evaluated": 166,
+    "precision": 0.625,
+    "recall": 0.4819277108433735,
+    "f1": 0.54421768707483,
+    "accuracy": 0.5963855421686747,
+    "fpr": 0.2891566265060241,
+    "fnr": 0.5180722891566265
+  },
+  "pair_level": {
+    "skip": {
+      "pairs_total": 83,
+      "pairs_evaluated": 83,
+      "pairs_missing": 0,
+      "P_C": 25,
+      "P_R": 9,
+      "both_vulnerable": 15,
+      "both_benign": 34,
+      "P_C_ratio": 0.30120481927710846,
+      "P_R_ratio": 0.10843373493975904,
+      "VPS": 0.1927710843373494
+    },
+    "count_wrong": {
+      "pairs_total": 83,
+      "pairs_evaluated": 83,
+      "pairs_missing": 0,
+      "P_C": 25,
+      "P_R": 9,
+      "both_vulnerable": 15,
+      "both_benign": 34,
+      "P_C_ratio": 0.30120481927710846,
+      "P_R_ratio": 0.10843373493975904,
+      "VPS": 0.1927710843373494
+    }
+  },
+  "coverage": 1.0,
+  "warnings": [],
+  "unknown_idx": []
+}

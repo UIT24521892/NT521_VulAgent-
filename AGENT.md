@@ -9,7 +9,7 @@ Nhóm 3 sinh viên, môn **NT521 – Lập trình khai thác lỗ hổng**. Hai 
 | Phần | Thư mục | Sản phẩm | Trạng thái |
 |---|---|---|---|
 | Mini seminar **S05 – Return-to-libc (ret2libc)** | [seminar_S05/](seminar_S05/) | Slide 12–14 trang + demo CTF + CVE, 20–30 phút | **ĐANG LÀM (đổi chủ đề ngày 2026-10-19)** |
-| Đề tài **VulAgent** – phát hiện lỗ hổng bằng lập và kiểm chứng giả thuyết | [vulagent/](vulagent/) | Mã pipeline, dữ liệu đánh giá, báo cáo, slide | **ĐÃ KÍCH HOẠT 2026-11-06**: xong Giai đoạn A + C0 (offline); chưa chạy LLM, chưa có pipeline của nhóm |
+| Đề tài **VulAgent** – phát hiện lỗ hổng bằng lập và kiểm chứng giả thuyết | [vulagent/](vulagent/) | Mã pipeline, dữ liệu đánh giá, báo cáo, slide | **ĐÃ KÍCH HOẠT 2026-11-06**: xong Giai đoạn A + C0 + pipeline của nhóm chạy offline bằng phát lại (2026-11-15); chưa gọi LLM |
 
 **Quy tắc trọng tâm:** hai phần chạy song song; làm phần người dùng nêu trong yêu cầu, nếu không nêu thì theo "Việc tiếp theo" trong [ROADMAP.md](ROADMAP.md). Với VulAgent: không gọi API tốn phí khi nhóm chưa chốt key và ngân sách; làm hết phần ngoại tuyến trước. Một ngoại lệ hợp lý: ghi chú nối hai phần đặt ở `notes/` của phần phát sinh và trỏ sang phần kia, không copy.
 
@@ -42,10 +42,12 @@ project_521/
 │   ├── experiment_manifest.yaml  # khóa giao thức thực nghiệm, số liệu paper, shasum dữ liệu
 │   ├── .env.example    #   mẫu biến môi trường (không chứa key)
 │   ├── docs/           #   source_audit, reproduction_contract, reproduction_plan (C0–C5)
-│   ├── scripts/        #   metrics.py (sample + pair + VPS)
-│   ├── src/            #   schema.py (validator output); mã pipeline của nhóm
+│   ├── scripts/        #   run_pipeline.py (chạy/phát lại), show_trace.py, metrics.py (sample + pair + VPS)
+│   ├── src/            #   pipeline.py, llm.py (backend replay/api), schema.py (validator output)
+│   ├── tests/          #   test_pipeline.py (unittest, không cần mạng)
+│   ├── configs/        #   danh sách ID cố định (demo, R3)
 │   ├── results/        #   tables/ (bảng tính lại được); raw/ (gitignore)
-│   ├── configs/ data/ tests/ slides/   # đã tạo, còn rỗng
+│   ├── data/ slides/   #   đã tạo, còn rỗng
 │   ├── upstream/       #   clone repo gốc HotFrom/VulAgent (gitignore; có key nhúng, không dùng, không commit)
 │   └── references/     #   tài liệu gốc của nhóm (prompt_nhom_3.md, kien_thuc_can_hoc.md)
 └── _archive/           # bản gốc đã tách; không sửa, không dùng làm nguồn chính

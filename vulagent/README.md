@@ -1,6 +1,21 @@
 # Đề tài VulAgent — phát hiện lỗ hổng mã nguồn bằng lập và kiểm chứng giả thuyết
 
-**Trạng thái (2026-11-14): xong Giai đoạn A (kiểm toán nguồn) + C0 (nền offline: metric, schema, kiểm rò nhãn, đối chiếu paper ACL); chưa chạy LLM, chưa có mã pipeline của nhóm.** Quy tắc chung: [../AGENT.md](../AGENT.md). Tài liệu: [docs/source_audit.md](docs/source_audit.md), [experiment_manifest.yaml](experiment_manifest.yaml), [docs/reproduction_contract.md](docs/reproduction_contract.md), [docs/reproduction_plan.md](docs/reproduction_plan.md) (C0–C5). Mã offline: [scripts/metrics.py](scripts/metrics.py), [src/schema.py](src/schema.py). Repo gốc clone cô lập ở `upstream/` (gitignore, không commit — có key nhúng cứng, không dùng). Bước tiếp: C1 dry-run 1 mẫu, cần key DashScope + ngân sách.
+**Trạng thái (2026-11-15): xong Giai đoạn A, C0 và Giai đoạn B ở mức offline — pipeline của nhóm chạy được bằng cách phát lại output công bố của repo gốc, có test; chưa gọi LLM lần nào.** Quy tắc chung: [../AGENT.md](../AGENT.md). Tài liệu: [docs/source_audit.md](docs/source_audit.md), [experiment_manifest.yaml](experiment_manifest.yaml), [docs/reproduction_contract.md](docs/reproduction_contract.md), [docs/reproduction_plan.md](docs/reproduction_plan.md) (C0–C5). Mã: [src/pipeline.py](src/pipeline.py), [src/llm.py](src/llm.py), [src/schema.py](src/schema.py), [scripts/run_pipeline.py](scripts/run_pipeline.py), [scripts/show_trace.py](scripts/show_trace.py), [scripts/metrics.py](scripts/metrics.py), [tests/](tests/). Repo gốc clone cô lập ở `upstream/` (gitignore, không commit — có key nhúng cứng, không dùng). Bước tiếp: C1 dry-run 1 mẫu, cần key DashScope + ngân sách.
+
+## Chạy thử (0 đồng, cần clone repo gốc vào `upstream/VulAgent`, commit `065467c`)
+
+```bash
+cd vulagent
+python3 -m unittest discover -s tests            # 16 test
+U=upstream/VulAgent
+python3 scripts/run_pipeline.py --data "$U/Dataset/SEVEN_context/test_with_idx_context_cleaned.jsonl" \
+    --replay-dir "$U/VulAgent_Seven/With contetxt/Qwen3" --out results/raw/replay_seven_qwen3
+python3 scripts/metrics.py --gt "$U/Dataset/SEVEN_context/test_with_idx_context_cleaned.jsonl" \
+    --pred results/raw/replay_seven_qwen3/predictions.jsonl --out results/tables/replay_seven_qwen3
+python3 scripts/show_trace.py results/raw/replay_seven_qwen3/traces/71_L71.json   # đọc một ca
+```
+
+`--backend replay` phát lại output từng agent mà repo gốc đã công bố; đó **không** phải kết quả nhóm chạy model. Chạy model thật: `--backend api --confirm-paid` cùng `--limit`/`--ids`, sau khi nhóm chốt key và ngân sách (xem [docs/reproduction_plan.md](docs/reproduction_plan.md) C1).
 
 - **Paper chính:** *VulAgent: Hypothesis-Validation Driven Multi-Agent Architecture for Vulnerability Detection* — [Findings of ACL 2026](https://aclanthology.org/2026.findings-acl.928/) (mốc trích dẫn chính). Đối chiếu [arXiv 2509.11523](https://arxiv.org/abs/2509.11523). Mã công khai: https://github.com/HotFrom/VulAgent
 - **Dữ liệu:** PrimeVul, SVEN — xác định đường dẫn, phiên bản, giấy phép, split thực tế từ nguồn chính thức trước khi tải.

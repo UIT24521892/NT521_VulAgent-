@@ -183,3 +183,19 @@ Tải `https://aclanthology.org/2026.findings-acl.928.pdf`, convert bằng Micro
 Kiểm phép trừ VPS = P-C − P-R: PrimeVul 26.6−10.1=16.5 ✓; SVEN 26.5−6.02=20.48≈20.4 ✓ (làm tròn). → **Ở dòng VulAgent, VPS khớp P-C − P-R.** (Ghi chú cũ "Bảng 1 có ô VPS không khớp" nhiều khả năng là lệch cột khi đọc bảng baseline bị trộn 2 nhóm cột PrimeVul/SVEN, không phải lỗi paper — các dòng baseline markitdown trích bị xô cột.) ACL cũng nêu rõ PrimeVul **test set = 435 cặp** (giải quyết mâu thuẫn val/test của arXiv) và SVEN 803 cặp, 9 CWE.
 
 **Còn lại (không chặn):** đối chiếu test IDs SEVEN 83 cặp với split paper (paper không liệt IDs); số Table 1 là của backend GPT-4o — nếu nhóm chạy Qwen3 thì so với dòng Qwen3 ở Table 2/phần robustness.
+
+### 7.6 Phát lại output công bố qua pipeline của nhóm (2026-11-15)
+
+Cách làm: `scripts/run_pipeline.py --backend replay` dựng lại prompt từ dữ liệu, lấy output từng agent đã lưu trong `*_full.json` của repo gốc, rồi áp luật quyết định của nhóm ([src/pipeline.py](../src/pipeline.py)). **Không gọi model**; số dưới đây mô tả lượt chạy Qwen3 mà repo gốc công bố, không phải kết quả nhóm chạy.
+
+| Tập (output Qwen3 công bố) | Mẫu phát lại | Trùng cờ repo gốc | `unknown` | Nguyên nhân `unknown` |
+|---|---|---|---|---|
+| SEVEN có context | 166/166 | 137 | **29** | 28 FinalValidator trả JSON không parse được; 1 Aggregator không cho danh sách candidate đọc được |
+| PrimeVul | 850/870 dòng (20 dòng không có fixture) | 843 | **7** | 3 lỗi LLM (sentinel, đã biết ở §7.2); 2 FinalValidator không parse được; 2 Aggregator không đọc được |
+
+- **Phát hiện mới — lỗi parse cũng thành benign âm thầm.** Cả 29 ca SEVEN và 7 ca PrimeVul đều mang cờ `final_vulnerability_reported=False` trong output công bố. Đối chứng bằng bản sao nguyên văn `strip_codeblock`/`safe_parse` của repo gốc: 28/28 output FinalValidator của SEVEN cũng trả `None` → `final_dict={}` → benign. `schema.py --repo` chỉ bắt sentinel lỗi LLM nên trước đây báo SEVEN "0 file dính lỗi".
+- **Dạng hỏng (SEVEN, 28 ca):** 19 "Unterminated string", 9 "Expecting ',' delimiter"; 27/28 output kết thúc dở dang (dài 7.2k–16.4k ký tự), phù hợp với việc bị cắt ở `max_tokens=4096` — fixture không lưu `finish_reason` nên **chưa xác minh** được nguyên nhân. Cả 28 ca là file C/C++ (`.c` 23, `.cc` 4, `.cpp` 1); 14 mẫu vulnerable và 14 mẫu fixed.
+- **Ảnh hưởng tới số công bố của SEVEN Qwen3** (tính bằng `metrics.py`, bảng ở `results/tables/seven_qwen3.json` và `replay_seven_qwen3.json`): theo cờ repo gốc TP 40/FP 24/FN 43/TN 59, recall 48.19%, P-C 25/83, P-R 9/83, VPS 19.28%. Khi tách 29 ca `unknown`: 137 mẫu có dự đoán, FN còn 28 (15/43 FN công bố là lỗi parse, không phải model kết luận an toàn), TN còn 45; trên 61 cặp đủ dự đoán P-C 20, P-R 3.
+- **Hệ quả cho nhóm:** khi chạy thật phải báo số `unknown` cạnh mọi bảng; cân nhắc tăng `max_tokens` của FinalValidator hoặc thử lại khi JSON hỏng, và khai báo đó là thay đổi so với repo gốc.
+- **Lỗi hoán đổi tham số:** `process_one` gọi `analyse(code, name, proj, context)` trong khi chữ ký là `analyse(src_code, proj, name, context)` → `{proj}` trong prompt nhận tên file, `{name}` nhận chuỗi `proj`. Pipeline nhóm giữ hành vi này mặc định để tái hiện (`--no-upstream-quirks` để sửa).
+- **Chi phí đo từ phát lại:** SEVEN 8.38 lời gọi/mẫu, PrimeVul 9.02 (paper: 8.83). Lượng ký tự prompt gấp khoảng 4 lần ký tự output — xem `experiment_manifest.yaml::cost.replay_measured`.

@@ -60,8 +60,16 @@ Rủi ro cần xác minh: evaluate.py ghép cặp theo thứ tự dòng; phải 
 - [x] C0.6 **(2026-11-09)** `shasum -a 256` 4 file dữ liệu → điền manifest; pin `openai>=1.40,<2.0` (chốt chính xác bằng `pip freeze` khi tạo `.venv` ở C1); `metrics.py`/`schema.py` chỉ cần thư viện chuẩn.
 - **Nghiệm thu C0:** ✅ **XONG.** `metrics.py --selftest` PASS + khớp fixture + định nghĩa P-R đã chốt theo ACL (đúng); `schema.py --selftest` PASS + validate 854 fixture, bắt cờ benign-do-lỗi; manifest đủ số (ACL verbatim) + shasum + ước chi phí. **Còn lẻ (không chặn):** đối chiếu test IDs SEVEN; dòng Qwen3 Table 2 (nếu nhóm chạy Qwen) — làm khi cần ở C3. → **Sẵn sàng sang C1 (dry-run token) khi nhóm cấp key + ngân sách.**
 
+### B — Pipeline của nhóm, chạy offline bằng phát lại (0 đồng) — XONG 2026-11-15
+- [x] B.1 [src/llm.py](../src/llm.py): backend `replay` (phát lại `*_full.json` công bố), `api` (key từ `.env`/biến môi trường, thử lại có giới hạn), `scripted` (test). Lời gọi hỏng ném `LLMError`, không trả chuỗi lỗi.
+- [x] B.2 [src/pipeline.py](../src/pipeline.py): MetaAgent → agent phát hiện → Aggregator → TriggerPlanner → UnifiedPruner → FinalValidator; lỗi LLM/parse → `unknown`; trace từng lời gọi; đếm candidate qua từng bước; `skip=("pruner",)`/`("context",)` cho ablation. Prompt nạp lúc chạy từ `upstream/` (không chép vì repo gốc thiếu LICENSE).
+- [x] B.3 [scripts/run_pipeline.py](../scripts/run_pipeline.py) (chạy, chạy tiếp, lọc theo ID, chặn gọi API khi chưa `--confirm-paid`), [scripts/show_trace.py](../scripts/show_trace.py) (đọc trace), `metrics.py` hiểu `unknown`.
+- [x] B.4 [tests/test_pipeline.py](../tests/test_pipeline.py): 16 test PASS (`python3 -m unittest discover -s tests`), gồm "lỗi ở mọi giai đoạn → unknown" và "nhãn không lọt vào prompt".
+- [x] B.5 Phát lại toàn bộ output Qwen3 công bố (SEVEN 166, PrimeVul 850): xem [source_audit §7.6](source_audit.md). Demo offline một cặp: `configs/seven_demo_ids.txt` (idx 71/72, SQL injection `.format()` so với truy vấn tham số hóa).
+- **Giới hạn:** chưa có lời gọi model nào của nhóm; nhánh `--backend api` và hai chế độ ablation mới được kiểm bằng test kịch bản, chưa chạy thật.
+
 ### C1 — Dry-run 1 mẫu (cần key, chi phí ~vài lời gọi) ← cổng ngân sách
-- [ ] C1.1 Tạo `.env` từ `.env.example`, điền `DASHSCOPE_API_KEY` riêng. Sửa 1 adapter đọc key từ env (KHÔNG dùng key nhúng).
+- [ ] C1.1 Tạo `.env` từ `.env.example`, điền `DASHSCOPE_API_KEY` riêng; `python3 -m venv .venv && .venv/bin/pip install "openai>=1.40,<2.0"`. Adapter đọc key từ env **đã có** (`src/llm.py`). Lệnh: `.venv/bin/python scripts/run_pipeline.py --backend api --confirm-paid --ids 71 --data "upstream/VulAgent/Dataset/SEVEN_context/test_with_idx_context_cleaned.jsonl" --out results/raw/c1_dryrun`.
 - [ ] C1.2 Chạy đúng **1 mẫu** SEVEN qua pipeline; lưu trace + đếm **token thực tế/mẫu**.
 - [ ] C1.3 Từ token/mẫu → **ước tính chi phí** cho 166 mẫu SEVEN và 870 mẫu PrimeVul (×1 và ×3 lượt). Cập nhật manifest.
 - **Nghiệm thu C1:** có số token/mẫu thật + bảng ước tính chi phí → **chốt phạm vi R với nhóm**.
@@ -72,7 +80,7 @@ Rủi ro cần xác minh: evaluate.py ghép cặp theo thứ tự dòng; phải 
 - **Nghiệm thu C2:** người khác lần ngược được từ kết luận về source/sink/guard trên 1 ca. (Đây là **demo**, chưa phải tái hiện.)
 
 ### C3 — Thí nghiệm thu nhỏ theo ID — R3
-- [ ] C3.1 Chốt tập con cố định theo **ID** (vd 20–40 cặp SEVEN), lưu danh sách ID vào `configs/`.
+- [x] C3.1 **(2026-11-15)** Tập con cố định: `configs/seven_r3_ids.txt` = 20 cặp đầu theo thứ tự file SEVEN (idx 1–40), chọn theo quy tắc, không dựa vào kết quả. Nhóm có thể đổi cỡ sau khi biết ngân sách.
 - [ ] C3.2 Chạy full pipeline trên tập con; xuất `results/raw/*.jsonl` + per-sample JSON.
 - [ ] C3.3 Chạy `scripts/metrics.py` → bảng ACC/P/R/F1/FPR/P-C/P-R/VPS **tính-lại-được**; so số paper, ghi chênh lệch.
 - **Nghiệm thu C3:** bảng metric tái tạo từ file thô + giải thích khác biệt với paper.
