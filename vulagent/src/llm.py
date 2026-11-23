@@ -14,6 +14,10 @@ Ba backend:
   - ScriptedBackend    : trả lời theo kịch bản, chỉ dùng cho test.
   - OpenAICompatBackend: gọi API thật (DashScope/OpenAI-compatible). Key đọc từ biến
                          môi trường; không bao giờ ghi key ra log/trace.
+  - AnthropicBackend   : gọi API Claude (SDK `anthropic` chính thức). Dùng khi chạy
+                         pipeline trên backend Claude — LƯU Ý: đây là thí nghiệm
+                         "đánh giá phương pháp trên backend khác", KHÔNG phải tái hiện
+                         đúng model của paper (Qwen3/GPT-4o).
 """
 from __future__ import annotations
 
@@ -161,3 +165,71 @@ class OpenAICompatBackend(Backend):
                 if attempt < self.max_retries:
                     time.sleep(2 ** attempt)
         raise LLMError(f"{agent}: {type(last).__name__}: {str(last)[:300]}")
+
+
+# ───────────────────────── API thật — Claude ─────────────────────────
+class AnthropicBackend(Backend):
+    """Gọi API Claude qua SDK `anthropic` chính thức (không dùng shim OpenAI). TỐN PHÍ.
+
+    KHÁC cấu hình paper: current Claude models (Opus/Sonnet/Haiku 5.x) **từ chối**
+    `temperature`/`top_p`, nên không set — đây là một lý do đây là thí nghiệm backend
+    khác, không phải tái hiện `temperature=0` của paper. Điều khiển độ sâu suy nghĩ
+    bằng `effort` (mặc định "low" để tiết kiệm token cho tác vụ phân loại).
+
+    Rủi ro cần theo dõi: bộ phân loại an toàn `cyber` của Claude có thể TỪ CHỐI một
+    số mẫu mã lỗ hổng (stop_reason="refusal") → ta ném LLMError → mẫu thành `unknown`,
+    không âm thầm biến thành benign.
+    """
+    name = "anthropic"
+    SYSTEM = "Please output strictly in JSON format. Only output the JSON object."
+
+    def __init__(self, api_key_env: str = "ANTHROPIC_API_KEY",
+                 base_url_env: str = "ANTHROPIC_BASE_URL",
+                 model_env: str = "VULAGENT_MODEL",
+                 effort_env: str = "VULAGENT_EFFORT",
+                 max_retries: int = 2, timeout_s: float = 600.0,
+                 max_tokens: int = 4096):
+        key = os.environ.get(api_key_env, "").strip()
+        self.model = os.environ.get(model_env, "").strip()
+        if not key:
+            raise LLMError(f"thiếu biến môi trường: {api_key_env}")
+        if not self.model:
+            raise LLMError(f"thiếu biến môi trường: {model_env}")
+        self.effort = os.environ.get(effort_env, "low").strip() or "low"
+        try:
+            from anthropic import Anthropic  # import trễ: phần offline không cần thư viện này
+        except ImportError as e:
+            raise LLMError("chưa cài gói `anthropic` (pip install anthropic)") from e
+        kwargs = {"api_key": key, "timeout": timeout_s, "max_retries": max_retries}
+        base_url = os.environ.get(base_url_env, "").strip()
+        if base_url:
+            kwargs["base_url"] = base_url
+        self._client = Anthropic(**kwargs)
+        self.max_tokens = max_tokens
+
+    def complete(self, agent: str, prompt: str) -> LLMResult:
+        t0 = time.time()
+        try:
+            resp = self._client.messages.create(
+                model=self.model,
+                max_tokens=self.max_tokens,
+                system=self.SYSTEM,
+                messages=[{"role": "user", "content": prompt}],
+                output_config={"effort": self.effort},
+            )
+        except Exception as e:  # SDK tự retry; chỉ giữ tên lớp + thông điệp, không giữ key
+            raise LLMError(f"{agent}: {type(e).__name__}: {str(e)[:300]}") from e
+
+        if getattr(resp, "stop_reason", None) == "refusal":
+            raise LLMError(f"{agent}: Claude từ chối (refusal) — không coi là benign")
+        # Chỉ lấy khối văn bản, bỏ khối thinking.
+        text = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text").strip()
+        if not text:
+            raise LLMError(f"{agent}: model trả nội dung rỗng (stop_reason={getattr(resp, 'stop_reason', None)})")
+        usage = getattr(resp, "usage", None)
+        return LLMResult(
+            text=text,
+            prompt_tokens=getattr(usage, "input_tokens", None),
+            completion_tokens=getattr(usage, "output_tokens", None),
+            latency_s=time.time() - t0,
+        )

@@ -33,7 +33,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from llm import OpenAICompatBackend, ReplayBackend, LLMError  # noqa: E402
+from llm import AnthropicBackend, OpenAICompatBackend, ReplayBackend, LLMError  # noqa: E402
 from pipeline import PromptStore, Sample, analyse              # noqa: E402
 from schema import validate_prototype_output                   # noqa: E402
 
@@ -88,6 +88,9 @@ def main() -> int:
     ap.add_argument("--data", type=Path, required=True, help="File .jsonl (idx, func, ...)")
     ap.add_argument("--out", type=Path, required=True, help="Thư mục kết quả (vd results/raw/<tên>)")
     ap.add_argument("--backend", choices=["replay", "api"], default="replay")
+    ap.add_argument("--provider", choices=["dashscope", "anthropic"], default="dashscope",
+                    help="Nhà cung cấp cho --backend api: dashscope (Qwen, đúng paper) hoặc "
+                         "anthropic (Claude, thí nghiệm backend khác)")
     ap.add_argument("--replay-dir", type=Path, help="Thư mục chứa *_full.json của repo gốc")
     ap.add_argument("--prompts", type=Path, default=DEFAULT_PROMPTS, help="Thư mục prompt template")
     ap.add_argument("--ids", help="Chỉ chạy các idx này (phân tách bằng dấu phẩy)")
@@ -125,9 +128,10 @@ def main() -> int:
             ap.error("--backend api cần --limit hoặc --ids để giới hạn số mẫu")
         load_env_file(ROOT / ".env")
         try:
-            api_backend = OpenAICompatBackend()
+            api_backend = (AnthropicBackend() if args.provider == "anthropic"
+                           else OpenAICompatBackend())
         except LLMError as e:
-            print(f"Không khởi tạo được backend API: {e}", file=sys.stderr)
+            print(f"Không khởi tạo được backend API ({args.provider}): {e}", file=sys.stderr)
             return 2
 
     prompts = PromptStore(args.prompts)
@@ -204,6 +208,7 @@ def main() -> int:
         "run_at": dt.datetime.now().astimezone().isoformat(timespec="seconds"),
         "command": " ".join(sys.argv),
         "data": str(args.data), "backend": args.backend,
+        "provider": args.provider if args.backend == "api" else None,
         "replay_dir": str(args.replay_dir) if args.replay_dir else None,
         "model": api_backend.model if api_backend else "upstream-published-output",
         "upstream_commit": upstream_commit(),
