@@ -137,3 +137,28 @@ So với lượt có context, (a) đổi phán quyết ở 19 mẫu (13 benign �
 Kết luận dùng cho báo cáo: với Haiku, context chủ yếu giúp Pruner **bác** giả định; trong pipeline này điều đó đổi thêm cả TP lẫn FP thành benign, nên không cải thiện VPS như bài báo ghi với GPT-4o. Bằng chứng vẫn là một lượt mỗi nhánh và Pruner/Validator tự dao động, nên đây là xu hướng, chưa phải kết luận thống kê.
 
 Phát hiện phụ: lượt này lưu `stop_reason`. **37/144 output Pruner gốc kết thúc vì `max_tokens`** (4096), xác nhận giả thuyết ở §3 rằng output Pruner không parse được là do bị cắt cụt.
+
+## 8. RQ3 — đo nhiễu: nhánh có context cũng chỉ chạy lại Pruner + Validator
+
+Lượt `results/raw/seven_claude_haiku_ctx_prefix/` (mã `59039d3`, `--reuse-prefix-from results/raw/seven_claude_haiku`, **có** context). Nhánh này và nhánh (a) ở §7 dùng chung output MetaAgent → TriggerPlanner phát lại, chỉ khác `{code_context}`. Chi phí: 288 lời gọi + 2 lời gọi chạy lại idx 3 (`unknown` ở lần đầu, có kết quả sau 1 lần chạy lại); 1,96M token vào, 0,69M token ra.
+
+```bash
+python3 scripts/metrics.py --gt "$D" --pred results/raw/seven_claude_haiku_ctx_prefix/predictions.jsonl --out results/tables/seven_claude_haiku_ctx_prefix
+```
+
+| Lượt (cùng phần đầu pipeline) | P-C / P-R / VPS / FPR / F1 / ACC (%) | Pruner `contradicted` / `unknown` |
+|---|---|---|
+| Có context, lượt gốc | 28.92 / 3.61 / 25.30 / 24.10 / 56.94 / 62.65 | 189 / 191 |
+| Có context, chạy lại Pruner + Validator | 25.30 / 2.41 / 22.89 / 22.89 / 54.29 / 61.45 | 196 / 196 |
+| Không context, chạy lại Pruner + Validator (§7) | 30.49 / 1.22 / 29.27 / 26.51 / 60.40 / 64.24 | 154 / 225 |
+
+So sánh theo mẫu (bỏ mẫu `unknown`; McNemar chính xác):
+
+| So sánh | Mẫu đổi | benign→vuln / vuln→benign | p |
+|---|---:|---:|---:|
+| **Nhiễu**: có context gốc vs có context chạy lại | 14 | 5 / 9 | 0,42 |
+| **Context**: có context chạy lại vs không context (cùng phần đầu) | 16 | 13 / 3 | 0,02 |
+
+**Kết luận RQ3 cho báo cáo.** Nhiễu của riêng Pruner + Validator đổi 14 mẫu theo cả hai chiều. Bỏ context đổi 16 mẫu, gần như cùng một chiều (13/16 sang vulnerable, p ≈ 0,02), và Pruner đánh dấu `contradicted` ít hơn rõ (189–196 có context so với 154–159 không context ở cả hai lượt không context). Vậy với Haiku, context có tác động thật và nhất quán: **nó giúp Pruner bác giả định, làm pipeline bảo thủ hơn** (FPR và recall cùng giảm). Tác động lên VPS thì ngược với bài báo: hai lượt có context cho VPS 25.30 và 22.89, hai lượt không context cho 29.27 và 28.92. Chênh lệch VPS vẫn cùng cỡ với dao động giữa hai lượt có context (2,4 điểm), nên chỉ phát biểu "context không cải thiện VPS với Haiku", không phát biểu "context làm VPS giảm".
+
+Nhánh này cũng xác nhận lại cắt cụt: 41/144 output Pruner dừng vì `max_tokens` (§7: 37/144).
