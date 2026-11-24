@@ -36,6 +36,7 @@ project_521/
 │   └── notes/          #   phân tích thủ công, bài tập 3 đoạn mã, nháp
 ├── vulagent/           # PHẦN 2 – đề tài chính
 │   ├── README.md
+│   ├── REQUIREMENTS.md #   tiêu chí chấm + đề CK19 nguyên văn (nguồn chuẩn)
 │   ├── PLAN.md         #   giai đoạn A–D, thực nghiệm, lịch
 │   ├── KNOWLEDGE.md    #   kiến thức cần học cho VulAgent
 │   ├── CHECKLIST.md

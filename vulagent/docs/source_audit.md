@@ -199,3 +199,82 @@ Cách làm: `scripts/run_pipeline.py --backend replay` dựng lại prompt từ 
 - **Hệ quả cho nhóm:** khi chạy thật phải báo số `unknown` cạnh mọi bảng; cân nhắc tăng `max_tokens` của FinalValidator hoặc thử lại khi JSON hỏng, và khai báo đó là thay đổi so với repo gốc.
 - **Lỗi hoán đổi tham số:** `process_one` gọi `analyse(code, name, proj, context)` trong khi chữ ký là `analyse(src_code, proj, name, context)` → `{proj}` trong prompt nhận tên file, `{name}` nhận chuỗi `proj`. Pipeline nhóm giữ hành vi này mặc định để tái hiện (`--no-upstream-quirks` để sửa).
 - **Chi phí đo từ phát lại:** SEVEN 8.38 lời gọi/mẫu, PrimeVul 9.02 (paper: 8.83). Lượng ký tự prompt gấp khoảng 4 lần ký tự output — xem `experiment_manifest.yaml::cost.replay_measured`.
+
+### 7.7 Đối chiếu arXiv v1 ↔ ACL 2026: bảng kết quả và danh sách thí nghiệm (2026-11-24)
+
+**Nguồn và cách đọc.** arXiv: `https://arxiv.org/html/2509.11523v1` (trang abs chỉ liệt kê **v1**, nộp 15-09-2025), trích bảng từ thẻ `<table>` của HTML. ACL: `https://aclanthology.org/2026.findings-acl.928.pdf` (19 trang, pp. 18598–18616), trích text bằng PyMuPDF. Mọi số dưới đây chép từ hai file đó; cột "nhóm tính lại" lấy từ `results/tables/*.json` (output do repo gốc công bố, chấm bằng `metrics.py`). Đề giao bản arXiv ([REQUIREMENTS.md](../REQUIREMENTS.md)); nhóm giữ ACL làm mốc chính và dùng mục này để giải thích khác biệt.
+
+#### a) Danh sách thí nghiệm
+
+| Thí nghiệm | arXiv v1 | ACL 2026 | Khác biệt |
+|---|---|---|---|
+| RQ1 so với baseline (PrimeVul + SVEN) | Table 1 | Table 1 | ACL **thêm dòng Semgrep**; ACL ghi "chạy **3 lần**, lấy trung bình" (arXiv không nêu số lượt) |
+| Ablation thành phần (bỏ FinalValidator / bỏ PathPruner) | **không có** | **Table 2 (mới)** | Thí nghiệm chỉ có ở ACL |
+| RQ2 tổng quát hóa qua 3 backend | Table 2 | Table 3 | Cùng số, ACL cắt bớt chữ số |
+| RQ3 có/không context | Table 3 | Table 4 | Cùng số, ACL cắt bớt chữ số |
+| RQ4 theo CWE | Table 4 (PrimeVul Top-8 + SVEN 9 CWE) | Table 5 (rút gọn 5+5) + Table 7 phụ lục (đầy đủ) | Table 7 ACL trùng Table 4 arXiv; Table 5 ACL có dòng **CWE-617** không nằm trong bảng đầy đủ |
+| RQ5 oracle-CWE trên SVEN | Table 5 | Table 6 | **Giống hệt** |
+| Radar theo CWE | Figure 4 | Figure 4 | Cùng nội dung |
+| Case study `search_make_new` (libevent) | Mục 5 | Mục 6 + Phụ lục A | Cùng ca |
+| Chi phí | 8.83 lời gọi, 7,036.95 token output/mẫu | như arXiv + so với GPTLens 2263.95, VulTrial 3119.16 token/mẫu | ACL thêm so sánh chi phí và mục Limitations |
+| Phụ lục | không có | A–G (case, luồng xử lý, bảng agent, nguồn context, thuật toán dựng context SVEN, đạo đức, prompt) | Chỉ có ở ACL |
+
+#### b) Số liệu VulAgent (các dòng nhóm cần so)
+
+Thứ tự cột: P-C / P-R / VPS / FPR / F1 / ACC (%).
+
+| Bảng | Dòng | arXiv v1 | ACL 2026 | Nhóm tính lại từ output công bố |
+|---|---|---|---|---|
+| RQ1 | GPT-4o, PrimeVul | 26.6 / 10.1 / 16.5 / 36.7 / 56.2 / **58.4** | 26.6 / 10.1 / 16.5 / 36.7 / 56.2 / **58.6** | 26.40 / 10.28 / 16.12 / 36.62 / 55.98 / 58.20 (428/435 cặp chấm được; một lượt, paper là trung bình 3 lượt) |
+| RQ1 | GPT-4o, SVEN | 26.5 / 6.02 / 20.4 / 55.4 / 65.62 / 60.2 | 26.5 / 6.02 / 20.4 / 55.4 / 65.6 / 60.2 | repo không công bố output GPT-4o cho SVEN |
+| RQ2 | Qwen3, PrimeVul | 25.75 / 11.03 / 14.71 / 40.15 / 57.70 / 57.36 | 25.7 / 11.0 / 14.7 / 40.1 / 57.7 / 57.3 | **25.75 / 11.03 / 14.71** / 43.42 / 57.76 / 57.37 |
+| RQ2 | Qwen3, SVEN | 30.12 / 10.84 / 19.28 / 28.91 / 54.42 / 59.63 | 30.1 / 10.8 / 19.2 / 28.9 / 54.4 / 59.6 | **30.12 / 10.84 / 19.28 / 28.92 / 54.42 / 59.64** |
+| RQ2 | DeepSeek v3.1, PrimeVul | 17.70 / 8.74 / 8.96 / 19.95 / 41.59 / 54.73 | 17.7 / 8.74 / 8.96 / 19.9 / 41.5 / 54.7 | không có output |
+| RQ2 | DeepSeek v3.1, SVEN | 30.12 / 9.64 / 20.48 / 31.30 / 56.58 / 60.20 | 30.1 / 9.64 / 20.4 / 31.3 / 56.5 / 60.2 | không có output |
+| RQ2 | GPT-4o, PrimeVul | 26.67 / 10.11 / 16.55 / 36.78 / 56.11 / 58.62 | 26.6 / 10.1 / 16.5 / 36.7 / 56.1 / 58.6 | như dòng RQ1 |
+| RQ2 | GPT-4o, SVEN | 26.51 / 6.02 / 20.49 / 55.42 / 65.62 / 60.20 | 26.5 / 6.02 / 20.4 / 55.4 / 65.6 / 60.2 | — |
+| RQ3 | PrimeVul w/o context | 17.50 / 7.50 / 10.00 / 38.75 / 52.00 / 55.00 | 17.5 / 7.5 / 10.0 / 38.7 / 52.0 / 55.0 | chưa chạy |
+| RQ3 | PrimeVul w/ context | 28.73 / 10.70 / 18.03 / 36.34 / 57.02 / 59.01 | 28.7 / 10.7 / 18.0 / 36.3 / 57.0 / 59.0 | chưa chạy |
+| RQ3 | SVEN w/o context | 20.48 / 7.20 / 13.25 / 60.00 / 63.27 / 56.63 | 20.4 / 7.20 / 13.2 / 60.0 / 63.2 / 56.6 | chưa chạy |
+| RQ3 | SVEN w/ context | 26.51 / 6.02 / 20.48 / 55.42 / 65.62 / 60.20 | 26.5 / 6.02 / 20.4 / 55.4 / 65.6 / 60.2 | — |
+| RQ5 | Direct (oracle-CWE, SVEN) | 36.14 / 12.05 / 24.10 / 49.40 / 65.95 / 62.05 | giống hệt | chưa chạy |
+| RQ5 | VulTrial (oracle-CWE) | 25.30 / 7.23 / 18.07 / 39.76 / 58.54 / 59.04 | giống hệt | chưa chạy |
+| RQ5 | VulAgent (oracle-CWE) | 24.10 / 1.20 / 22.98 / 20.48 / 52.94 / 61.45 | giống hệt | chưa chạy |
+
+Chỉ có ở ACL — Table 2 (ablation thành phần):
+
+| Dataset | Cấu hình | P-C / P-R / VPS / FPR / F1 / ACC |
+|---|---|---|
+| PrimeVul | đầy đủ | 26.61 / 10.10 / 16.50 / 36.70 / 56.20 / 58.60 |
+| PrimeVul | bỏ FinalValidator | 15.56 / 11.94 / 3.62 / 65.00 / 58.74 / 51.81 |
+| PrimeVul | bỏ PathPruner | 15.63 / 10.34 / 5.29 / 61.15 / 58.38 / 52.64 |
+| SVEN | đầy đủ | 26.50 / 6.02 / 20.40 / 55.40 / 65.60 / 60.20 |
+| SVEN | bỏ FinalValidator | 12.07 / 7.23 / 4.48 / 72.29 / 61.48 / 52.41 |
+| SVEN | bỏ PathPruner | 18.07 / 4.82 / 13.25 / 62.65 / 63.64 / 56.62 |
+
+Các dòng baseline của Table 1 (UniXcoder, GPT-3.5 CoT/GPTLens/VulTrial, GPT-4o CoT/LLM-MultiRole/GPTLens/VulTrial) **giống nhau từng số** giữa hai bản; ACL chỉ thêm Semgrep (PrimeVul 0.00 / 0.08 / −0.08 / 64.0 / 50.9 / 46.0; SVEN 0.00 / 0.00 / 0.00 / 31.3 / 38.5 / 50.0).
+
+#### c) Bảng khác biệt hoàn chỉnh và lý do lấy ACL làm mốc
+
+| Điểm | arXiv v1 | ACL 2026 | Nhận xét |
+|---|---|---|---|
+| Định nghĩa P-R (câu chữ) | "both functions are incorrectly classified as vulnerable" (Sec 3.3) | nhãn bị đoán **đảo** (Sec 4.3) | **Số trong bảng arXiv đã tính theo nghĩa "đảo"**: với output Qwen3 SVEN công bố, số cặp đảo = 9/83 = 10.84% (khớp Table 2 arXiv), còn số cặp "cả hai vulnerable" = 15/83 = 18.07% (không khớp). PrimeVul Qwen3 tương tự: đảo 11.03% (khớp), cả hai vulnerable 32.41%. ⇒ arXiv sai ở câu mô tả, không sai ở số; ACL sửa câu chữ. |
+| Tên tập 435 cặp PrimeVul | Sec 3.1 "validation set", Sec 4.3 "test set" | "test set" thống nhất | ACL hết mâu thuẫn nội bộ |
+| Split SVEN | "9:1 train/validation" | "8:1:1 train/validation/test" | Cả hai bản **không nêu số cặp đánh giá**; số 83 cặp suy từ dữ liệu repo và từ mẫu số của bảng (9/83 = 10.84%) |
+| ACC VulAgent GPT-4o PrimeVul | Table 1 ghi 58.4, Table 2 ghi 58.62, lời văn "+5.0 điểm" | 58.6 ở cả hai bảng, "+5.2 pp" | arXiv tự lệch giữa hai bảng; ACL nhất quán |
+| FPR PrimeVul trong lời văn | "36.8%" (bảng 36.7) | "36.7%" | lỗi làm tròn ở arXiv |
+| Số lượt chạy | không nêu | 3 lượt, lấy trung bình | ACL rõ giao thức hơn |
+| Ablation thành phần | không có | Table 2 | Bằng chứng trực tiếp cho vai trò Pruner/FinalValidator chỉ có ở ACL |
+| Baseline Semgrep | không có | có | |
+| Link mã nguồn | chỉ viết "We have also released…", **không có URL** | `https://github.com/HotFrom/VulAgent` | Căn cứ xếp đề vào nhánh "có mã nguồn công khai" nằm ở bản ACL |
+| Tên giai đoạn | Phase I–IV; "Hypothesis-Path Verification" | "Hypothesis-Path validation"; tên agent PathPrunerAgent / FinalValidatorAgent xuất hiện trong bảng ablation | |
+| Thảo luận hạn chế | Mục 6 Discussion (threats, limitations ngắn) | Mục 9 Limitations (context, coverage, chi phí có số) + Phụ lục F đạo đức | |
+
+**Điểm tồn tại ở CẢ hai bản (không phải ACL sửa được hết):**
+- Table 1, các dòng baseline: cột VPS không bằng P-C − P-R (vd GPT-4o VulTrial PrimeVul 18.6 − 11.4 = 7.2 nhưng in 7.13; GPT-3.5 VulTrial cùng P-C/P-R lại in 1.38; GPT-3.5 GPTLens 10.1 − 6.44 = 3.66 nhưng in −0.91). Dòng VulAgent thì khớp. Không rõ nguyên nhân; khi trích baseline phải ghi "số in trong bài".
+- RQ5: 24.10 − 1.20 = 22.90 nhưng in 22.98.
+- FPR Qwen3 PrimeVul: bài in 40.15, tính từ output công bố ra 43.42 (P-C/P-R/VPS/F1/ACC thì khớp). Chưa giải thích được.
+
+**Kết luận dùng cho slide/báo cáo.** Hai bản cùng tác giả, cùng phương pháp, cùng bộ số chính (Table 1 dòng VulAgent, RQ2, RQ3, RQ5 trùng nhau, ACL chỉ làm tròn). ACL là bản đã bình duyệt, sửa câu định nghĩa P-R cho đúng với cách tính thực tế, thống nhất tên split, nêu số lượt chạy, thêm ablation thành phần + Semgrep + phụ lục, và là bản duy nhất dẫn URL repo. Vì vậy lấy ACL làm mốc không làm đổi mục tiêu tái hiện của bản arXiv; phần chỉ có ở ACL (ablation Table 2) là thí nghiệm cộng thêm.
+
+> Đính chính §7.5: câu "KHÔNG phải 8:1:1" chỉ đúng với arXiv v1 (9:1); ACL ghi 8:1:1. Câu "arXiv v1 định nghĩa P-R khác — bỏ qua" nay thay bằng nhận xét ở bảng (c): khác ở câu chữ, số liệu vẫn theo nghĩa đảo nhãn.

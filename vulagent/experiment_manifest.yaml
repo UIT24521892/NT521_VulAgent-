@@ -24,15 +24,16 @@ paper_facts:
     programs: 1606
     pairs: 803
     languages: "C/C++ và Python"   # xác nhận SEVEN gồm Python
-    split: "9:1 train/validation (KHÔNG phải 8:1:1; paper KHÔNG nêu test split)"
+    split: "arXiv v1: 9:1 train/validation; ACL 2026: 8:1:1 train/validation/test (đối chiếu 2026-11-24). Cả hai bản KHÔNG nêu số cặp đánh giá"
     test_pairs_stated: "NOT STATED"  # paper không nêu số cặp test → file 83 cặp là tập đánh giá của nhóm/repo, không trích được từ paper
   # ✅ ĐỊNH NGHĨA CHUẨN = bản ACL PDF (primary), đọc 2026-11-09 qua markitdown 0.1.9, Sec 4.2 verbatim:
   metric_definitions_acl:
     P_C: "percentage of function pairs where both functions are correctly classified (vulnerable as vulnerable, fixed as benign)"
     P_R: "percentage of pairs where the two labels are predicted inversely (vulnerable predicted as benign while the fixed version is predicted as vulnerable)"
     VPS: "VPS = P-C − P-R (net gain of correct over reversed pair-wise predictions)"
-  metric_definitions_arxiv_v1_IGNORE:   # bản tiền ấn phẩm, câu chữ KHÁC — KHÔNG dùng
-    P_R: "both functions are incorrectly classified as vulnerable (khác ACL — bỏ qua)"
+  metric_definitions_arxiv_v1_IGNORE:   # câu chữ KHÁC ACL, nhưng SỐ trong bảng arXiv vẫn tính theo nghĩa đảo nhãn (source_audit §7.7c)
+    P_R: "both functions are incorrectly classified as vulnerable (verbatim Sec 3.3)"
+    evidence_numbers_use_reversed: "Qwen3 SVEN công bố: đảo 9/83=10.84% (khớp Table 2 arXiv); cả-hai-vulnerable 15/83=18.07% (không khớp)"
   pr_definition_resolved: "RESOLVED (2026-11-09): ACL = nhãn ĐẢO (vuln→benign & fixed→vuln). metrics.py dòng 190 KHỚP → KHÔNG sửa logic. Xem docs/source_audit.md §7.5"
   backends_reported: ["GPT-4o (Table 1 chính)", "Qwen3-235B-A22-instruct", "DeepSeek v3.1", "GPT-3.5 (baseline)"]
   inference_params_paper: "temperature 0, top_p 1, truy cập qua commercial API — khớp mã repo"
@@ -43,6 +44,33 @@ paper_facts:
     note: "số của VulAgent trên GPT-4o — MỐC tham chiếu lịch sử, KHÔNG phải số nhóm chạy. Nếu nhóm chạy Qwen3 → so dòng Qwen3 (Table 2/robustness, chưa trích verbatim)"
     primevul: { P_C: 26.6, P_R: 10.1, VPS: 16.5, FPR: 36.7, F1: 56.2, ACC: 58.6 }
     sven:     { P_C: 26.5, P_R: 6.02, VPS: 20.4, FPR: 55.4, F1: 65.6, ACC: 60.2 }
+  # ── Bổ sung 2026-11-24: bảng arXiv v1 (HTML, verbatim) đặt cạnh ACL. Chi tiết đầy đủ: docs/source_audit.md §7.7
+  arxiv_v1_tables:                # thứ tự: P_C, P_R, VPS, FPR, F1, ACC
+    versions_on_arxiv: "chỉ v1 (15-09-2025)"
+    code_url_in_arxiv: "KHÔNG có URL (chỉ câu 'We have also released ...'); URL repo chỉ có ở ACL"
+    table1_vulagent_gpt4o:
+      primevul: [26.6, 10.1, 16.5, 36.7, 56.2, 58.4]    # ACC 58.4 ở Table 1 nhưng 58.62 ở Table 2 (arXiv tự lệch); ACL 58.6
+      sven:     [26.5, 6.02, 20.4, 55.4, 65.62, 60.2]
+    table2_generalization:
+      deepseek_v3_1: { primevul: [17.70, 8.74, 8.96, 19.95, 41.59, 54.73], sven: [30.12, 9.64, 20.48, 31.30, 56.58, 60.20] }
+      qwen3_235b:    { primevul: [25.75, 11.03, 14.71, 40.15, 57.70, 57.36], sven: [30.12, 10.84, 19.28, 28.91, 54.42, 59.63] }
+      gpt4o:         { primevul: [26.67, 10.11, 16.55, 36.78, 56.11, 58.62], sven: [26.51, 6.02, 20.49, 55.42, 65.62, 60.20] }
+    table3_context_gpt4o:
+      primevul_wo: [17.50, 7.50, 10.00, 38.75, 52.00, 55.00]
+      primevul_w:  [28.73, 10.70, 18.03, 36.34, 57.02, 59.01]
+      sven_wo:     [20.48, 7.20, 13.25, 60.00, 63.27, 56.63]
+      sven_w:      [26.51, 6.02, 20.48, 55.42, 65.62, 60.20]
+    table5_oracle_cwe_sven:       # giống hệt ACL Table 6
+      direct:   [36.14, 12.05, 24.10, 49.40, 65.95, 62.05]
+      vultrial: [25.30, 7.23, 18.07, 39.76, 58.54, 59.04]
+      vulagent: [24.10, 1.20, 22.98, 20.48, 52.94, 61.45]
+  acl_only:
+    runs: "3 lượt, lấy trung bình (Sec 5.1)"
+    table2_component_ablation:    # F = FinalValidatorAgent, P = PathPrunerAgent
+      primevul: { full: [26.61, 10.10, 16.50, 36.70, 56.20, 58.60], wo_F: [15.56, 11.94, 3.62, 65.00, 58.74, 51.81], wo_P: [15.63, 10.34, 5.29, 61.15, 58.38, 52.64] }
+      sven:     { full: [26.50, 6.02, 20.40, 55.40, 65.60, 60.20], wo_F: [12.07, 7.23, 4.48, 72.29, 61.48, 52.41], wo_P: [18.07, 4.82, 13.25, 62.65, 63.64, 56.62] }
+    semgrep_baseline: { primevul: [0.00, 0.08, -0.08, 64.0, 50.9, 46.0], sven: [0.00, 0.00, 0.00, 31.3, 38.5, 50.0] }
+    output_tokens_per_sample_baselines: { gptlens: 2263.95, vultrial: 3119.16 }
 
 upstream_repo:
   url: "https://github.com/HotFrom/VulAgent"
