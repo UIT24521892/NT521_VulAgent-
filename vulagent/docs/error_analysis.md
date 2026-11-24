@@ -90,3 +90,28 @@ Pilot khóa trước trên 56 mẫu cho kết quả **âm**. V2 cứu 26/28 FN v
 Trong đối chiếu hậu nghiệm, quy tắc “giữ mọi candidate” dự đoán vulnerable nếu Aggregator đã lưu ít nhất một candidate. Dự đoán của quy tắc này trùng với v2 ở **54/56 mẫu**. Hai mẫu khác là FN 45 và 121 mà v2 vẫn bác hết. Trên cả 12 cặp đủ hai vế, hai phương án cho cùng dự đoán. So với Haiku gốc, 11 cặp chuyển từ cả hai benign sang cả hai vulnerable. Chỉ cặp 39/40 được dự đoán đúng cả hai vế. Cả ba phương án có P-R bằng 0. Các cặp được chọn theo lỗi của đối chứng nên các tỷ lệ này chỉ mô tả tập pilot. [Bảng kết quả pilot, mục `post_hoc`](../results/tables/seven_claude_haiku_verification_v2_pilot.json)
 
 Validator trả 117 phán quyết giữ và 13 phán quyết bác ở mức issue. Bước kiểm tra trích dẫn không đổi phán quyết nào. Trên 47 mẫu có candidate, output Pruner gốc có 6 ca không parse được. V2 parse được cả 47 và API báo `end_turn` ở cả 47. V2 dùng lại candidate sau Aggregator và thay báo cáo TriggerPlanner bằng đánh giá tĩnh. Thí nghiệm đo hiệu ứng tổng hợp của thiết kế kiểm chứng trên danh sách candidate cố định, gồm thay đổi đầu vào, prompt và trần token.
+
+## 6. RQ3 — có và không có code context trên SVEN (83 cặp)
+
+Lượt không context: `results/raw/seven_claude_haiku_noctx/` (166 mẫu, `claude-haiku-5-5`, mã commit `3b4a4d1`, prompt gốc, `--skip context`; 165 mẫu chạy thành 6 tiến trình song song, idx 1 từ lượt tuần tự trước). Lần chạy đầu có 2 mẫu `unknown`: idx 159 (FinalValidator trả rỗng, `stop_reason=max_tokens`) và idx 79 (Aggregator không parse được). Hai mẫu này được chạy lại riêng một lần bằng đúng mã `3b4a4d1`; bản ghi lỗi còn trong `results/raw/seven_claude_haiku_noctx_parts/`. Chi phí: 1.535 lời gọi, 5,83M token vào và 1,82M token ra, thêm 16 lời gọi (48k vào, 19k ra) của hai lần lỗi.
+
+```bash
+python3 scripts/metrics.py --gt "$D" --pred results/raw/seven_claude_haiku_noctx/predictions.jsonl --out results/tables/seven_claude_haiku_noctx
+```
+
+Cột: P-C / P-R / VPS / FPR / F1 / ACC (%).
+
+| Lượt | Không context | Có context |
+|---|---|---|
+| Bài báo, GPT-4o, SVEN (Table 3 arXiv) | 20.48 / 7.20 / 13.25 / 60.00 / 63.27 / 56.63 | 26.51 / 6.02 / 20.48 / 55.42 / 65.62 / 60.20 |
+| Nhóm, Haiku, 1 lượt | **34.94 / 6.02 / 28.92 / 24.10 / 59.86 / 64.46** | 28.92 / 3.61 / 25.30 / 24.10 / 56.94 / 62.65 |
+
+Mức mẫu: không context TP 44 FP 20 FN 39 TN 63; có context TP 41 FP 20 FN 42 TN 63.
+
+**Kết luận hiện tại: chưa tách được hiệu ứng của context khỏi biến thiên giữa các lượt chạy.** Với Haiku, bỏ context làm VPS tăng 3,6 điểm, trong khi bài báo ghi giảm 7,2 điểm. Lý do chưa kết luận:
+
+- Giữa hai lượt có 23 mẫu đổi phán quyết (13 mẫu chuyển sang vulnerable, 10 mẫu chuyển sang benign; McNemar chính xác p ≈ 0,68). Theo cặp, 12 cặp mới thành P-C và 7 cặp mất P-C (p ≈ 0,36). Giá trị p chỉ nói chênh lệch nhỏ, không nói chênh lệch đến từ nguồn nào.
+- Trong pipeline, context chỉ đi vào **UnifiedPruner** (`{code_context}`). Các agent trước Aggregator (MetaAgent và agent phát hiện) nhận prompt giống hệt nhau ở hai lượt, nhưng output vẫn khác: xét lời gọi đầu tiên của mỗi agent trên mỗi mẫu, 927 cặp lời gọi trùng hash prompt thì 671 cặp khác văn bản output (Codex đếm theo cách lọc khác ra 634/761, cùng kết luận). Backend Anthropic không đặt `temperature`, nên hai lượt khác nhau do cả context lẫn nhiễu ngẫu nhiên của model, và một lượt mỗi bên không tách được hai nguồn.
+- Bài báo dùng GPT-4o và lấy trung bình 3 lượt; FPR của bài (55–60%) khác hẳn Haiku (24%), nên chỉ so được chiều thay đổi, không so được độ lớn.
+
+Cách tách hiệu ứng context khỏi nhiễu: (a) giữ nguyên output MetaAgent → TriggerPlanner của lượt có context, chỉ chạy lại Pruner + Validator với context rỗng, khoảng 2 lời gọi mỗi mẫu có candidate; hoặc (b) chạy thêm một lượt có context để đo mức dao động giữa hai lượt cùng cấu hình. **Người dùng chọn (a) ngày 2026-11-24**; kết quả ghi ở mục 7 khi chạy xong.
