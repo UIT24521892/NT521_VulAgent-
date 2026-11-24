@@ -115,3 +115,25 @@ Mức mẫu: không context TP 44 FP 20 FN 39 TN 63; có context TP 41 FP 20 FN 
 - Bài báo dùng GPT-4o và lấy trung bình 3 lượt; FPR của bài (55–60%) khác hẳn Haiku (24%), nên chỉ so được chiều thay đổi, không so được độ lớn.
 
 Cách tách hiệu ứng context khỏi nhiễu: (a) giữ nguyên output MetaAgent → TriggerPlanner của lượt có context, chỉ chạy lại Pruner + Validator với context rỗng, khoảng 2 lời gọi mỗi mẫu có candidate; hoặc (b) chạy thêm một lượt có context để đo mức dao động giữa hai lượt cùng cấu hình. **Người dùng chọn (a) ngày 2026-11-24**; kết quả ghi ở mục 7 khi chạy xong.
+
+## 7. RQ3 tách biến (a) — giữ nguyên phần đầu pipeline, chỉ đổi context
+
+Lượt `results/raw/seven_claude_haiku_noctx_prefix/` (mã commit `59039d3`, `--skip context --reuse-prefix-from results/raw/seven_claude_haiku`). Output MetaAgent → TriggerPlanner được phát lại nguyên văn từ trace của lượt có context (hash prompt kiểm từng lời gọi; phát lại offline cả 166 trace tái tạo đúng 166/166 phán quyết). Chỉ UnifiedPruner và FinalValidator được gọi lại, với `{code_context}` = `{}`. 22 mẫu không có candidate không gọi API. Chi phí: 288 lời gọi + 4 lời gọi chạy lại 2 mẫu `unknown`; 1,68M token vào, 0,70M token ra. Idx 159 chạy lại thì có kết quả; idx 161 vẫn `unknown` (Validator chạm `max_tokens`), để nguyên.
+
+```bash
+python3 scripts/metrics.py --gt "$D" --pred results/raw/seven_claude_haiku_noctx_prefix/predictions.jsonl --out results/tables/seven_claude_haiku_noctx_prefix
+```
+
+Cột: P-C / P-R / VPS / FPR / F1 / ACC (%).
+
+| Lượt | Số liệu |
+|---|---|
+| Có context (gốc) | 28.92 / 3.61 / 25.30 / 24.10 / 56.94 / 62.65 |
+| (a) Không context, phần đầu giữ nguyên | 30.49 / 1.22 / **29.27** / 26.51 / 60.40 / 64.24 (82 cặp; tính cặp thiếu là sai: VPS 28.92) |
+| Không context, chạy lại toàn bộ (§6) | 34.94 / 6.02 / 28.92 / 24.10 / 59.86 / 64.46 |
+
+So với lượt có context, (a) đổi phán quyết ở 19 mẫu (13 benign → vulnerable, 6 vulnerable → benign; McNemar p ≈ 0,17), ít hơn 23 mẫu của lượt chạy lại toàn bộ dù chỉ còn hai khâu có thể dao động. Chiều thay đổi nhất quán ở cả hai lượt không context: **bỏ context làm Pruner ít đánh dấu `contradicted` hơn** (189 → 154 ở (a), 159 ở §6; nhãn `unknown` tăng 191 → 225 và 217), nên Validator bác ít hơn, recall và FPR cùng tăng nhẹ, VPS gần như không đổi.
+
+Kết luận dùng cho báo cáo: với Haiku, context chủ yếu giúp Pruner **bác** giả định; trong pipeline này điều đó đổi thêm cả TP lẫn FP thành benign, nên không cải thiện VPS như bài báo ghi với GPT-4o. Bằng chứng vẫn là một lượt mỗi nhánh và Pruner/Validator tự dao động, nên đây là xu hướng, chưa phải kết luận thống kê.
+
+Phát hiện phụ: lượt này lưu `stop_reason`. **37/144 output Pruner gốc kết thúc vì `max_tokens`** (4096), xác nhận giả thuyết ở §3 rằng output Pruner không parse được là do bị cắt cụt.

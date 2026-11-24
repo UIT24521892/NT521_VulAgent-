@@ -17,7 +17,7 @@ Nguồn chuẩn: [REQUIREMENTS.md](REQUIREMENTS.md). Phần này thay cho mọi 
 | RQ1 — baseline CoT cùng model, cùng ID | Viết `--mode cot` (1 lời gọi/mẫu, cùng context) + chạy SEVEN | ❌ chưa có mã | rất rẻ: 166 lời gọi |
 | RQ1 — VulAgent trên PrimeVul | Chạy 435 cặp hoặc tập con có quy tắc công khai | ❌ chưa chạy | toàn bộ ≈ 5.2 × lượt SEVEN; tập con 100 cặp ≈ 1.2 × |
 | RQ2 — nhiều backend | Không chạy lại 3 model của bài; thay bằng: số công bố Qwen3 tính lại + Haiku của nhóm | ✅ bảng ở [error_analysis §1](docs/error_analysis.md) | 0 |
-| RQ3 — có/không context | Chạy SEVEN với `--skip context` | ✅ 1 lượt (VPS 28.92 không context vs 25.30 có context; chưa tách được khỏi biến thiên giữa lượt) — [error_analysis §6](docs/error_analysis.md); 🔄 lượt (a) giữ nguyên phần đầu pipeline, chỉ chạy lại Pruner + Validator | (a) ≈ 290 lời gọi |
+| RQ3 — có/không context | Chạy SEVEN với `--skip context` | ✅ 1 lượt (VPS 28.92 không context vs 25.30 có context; chưa tách được khỏi biến thiên giữa lượt) — [error_analysis §6](docs/error_analysis.md); ✅ lượt (a) giữ nguyên phần đầu pipeline: VPS 29.27, Pruner ít `contradicted` hơn khi bỏ context — [§7](docs/error_analysis.md) | (a) 292 lời gọi, 1,68M vào |
 | RQ4 — theo CWE | Bảng per-CWE từ lượt SEVEN đã có | ✅ `metrics.py` xuất `per_cwe`; bảng ở [error_analysis §2](docs/error_analysis.md) | 0 |
 | RQ5 — oracle-CWE | Ngoài phạm vi trừ khi còn ngân sách; ghi rõ không tái hiện | ⏸ không làm | — |
 | Ablation bỏ Pruner / bỏ FinalValidator | **Chỉ có ở ACL** (Table 2), không bắt buộc theo đề; `--skip pruner` đã có, bỏ FinalValidator chưa có | ⏸ tùy ngân sách | ≈ 1 × lượt SEVEN mỗi cấu hình |

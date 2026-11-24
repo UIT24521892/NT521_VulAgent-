@@ -15,7 +15,7 @@ Xếp theo tiêu chí chấm ở [REQUIREMENTS.md](REQUIREMENTS.md); trạng th�
 - [ ] RQ1: PrimeVul (toàn bộ hoặc tập con có quy tắc).
 - [x] RQ2: bảng so backend (Qwen3 công bố tính lại + Haiku) — `docs/error_analysis.md` §1.
 - [x] RQ3: SEVEN không context, 166 mẫu ([error_analysis §6](docs/error_analysis.md)).
-- [ ] RQ3 (a): giữ nguyên phần đầu pipeline, chỉ chạy lại Pruner + Validator với context rỗng.
+- [x] RQ3 (a): giữ nguyên phần đầu pipeline, chỉ chạy lại Pruner + Validator với context rỗng ([error_analysis §7](docs/error_analysis.md)).
 - [x] RQ4: bảng per-CWE — `docs/error_analysis.md` §2.
 - [ ] RQ5 và ablation ACL: ghi rõ làm hay không và vì sao.
 - [ ] Kịch bản demo + video dự phòng + một ca candidate bị guard chặn.
