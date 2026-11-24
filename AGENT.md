@@ -9,9 +9,11 @@ Nhóm 3 sinh viên, môn **NT521 – Lập trình khai thác lỗ hổng**. Hai 
 | Phần | Thư mục | Sản phẩm | Trạng thái |
 |---|---|---|---|
 | Mini seminar **S05 – Return-to-libc (ret2libc)** | [seminar_S05/](seminar_S05/) | Slide 12–14 trang + demo CTF + CVE, 20–30 phút | **TẠM DỪNG (2026-11-23)**: demo `split` ra flag (lần 1) + nội dung 10 mục đã có; còn demo lần 2 + ảnh evidence + file slide. Dừng theo yêu cầu người dùng để dồn sức VulAgent |
-| Đề tài **VulAgent** – phát hiện lỗ hổng bằng lập và kiểm chứng giả thuyết | [vulagent/](vulagent/) | Mã pipeline, dữ liệu đánh giá, báo cáo, slide | **🎯 TRỌNG TÂM HIỆN TẠI (2026-11-23)**: xong Giai đoạn A + C0 + pipeline của nhóm chạy offline bằng phát lại (2026-11-15); chưa gọi LLM (C1 trở đi chờ nhóm chốt key DashScope + ngân sách + hạn) |
+| Đề tài **VulAgent** (đề CK19) – phát hiện lỗ hổng bằng lập và kiểm chứng giả thuyết | [vulagent/](vulagent/) | Mã pipeline, dữ liệu đánh giá, báo cáo, slide | **🎯 TRỌNG TÂM HIỆN TẠI**: đã chạy SEVEN đủ 166 mẫu bằng Claude Haiku (2026-11-24) và đối chiếu arXiv ↔ ACL; còn baseline, có/không context, PrimeVul, cải tiến — xem bảng trạng thái ở [vulagent/PLAN.md](vulagent/PLAN.md) §0 |
 
-**Quy tắc trọng tâm:** **Từ 2026-11-23, trọng tâm là VulAgent; S05 tạm dừng** theo yêu cầu người dùng (quyết định này thay cho mặc định "hai phần song song"). Làm phần người dùng nêu trong yêu cầu, nếu không nêu thì theo "Việc tiếp theo" trong [ROADMAP.md](ROADMAP.md) (hiện là VulAgent). Với VulAgent: không gọi API tốn phí khi nhóm chưa chốt key và ngân sách; làm hết phần ngoại tuyến trước. Một ngoại lệ hợp lý: ghi chú nối hai phần đặt ở `notes/` của phần phát sinh và trỏ sang phần kia, không copy.
+**Git (từ 2026-11-24):** `seminar_S01/` và `seminar_S05/` đã gỡ khỏi repo và nằm trong `.gitignore`; file vẫn ở máy, bản cũ còn trong lịch sử git. Repo trên GitHub chỉ chứa VulAgent. Không `git add` lại hai thư mục này khi người dùng chưa yêu cầu.
+
+**Quy tắc trọng tâm:** **Từ 2026-11-23, trọng tâm là VulAgent; S05 tạm dừng** theo yêu cầu người dùng (quyết định này thay cho mặc định "hai phần song song"). Làm phần người dùng nêu trong yêu cầu, nếu không nêu thì theo "Việc tiếp theo" trong [ROADMAP.md](ROADMAP.md) (hiện là VulAgent). Với VulAgent: mỗi lượt gọi API tốn phí phải được người dùng đồng ý trước (nêu số mẫu và ước lượng token); việc không tốn phí thì làm luôn. Một ngoại lệ hợp lý: ghi chú nối hai phần đặt ở `notes/` của phần phát sinh và trỏ sang phần kia, không copy.
 
 **S05 là phạm vi làm việc độc lập:** chọn kiến thức, challenge và CVE theo mức độ liên quan trực tiếp đến ret2libc. Mọi kết quả, offset, slide và bằng chứng phải được xác nhận cho chính S05; không lấy chủ đề seminar trước làm cơ sở chọn nội dung.
 
@@ -23,7 +25,7 @@ project_521/
 ├── CLAUDE.md           # trỏ tới AGENT.md để Claude Code tự nạp
 ├── README.md           # tổng quan repo cho người đọc ngoài
 ├── ROADMAP.md          # kế hoạch tổng + trạng thái hiện tại + nhật ký
-├── seminar_S05/        # PHẦN 1 – mini seminar đang làm
+├── seminar_S05/        # PHẦN 1 – mini seminar (tạm dừng; chỉ ở máy, gitignore)
 │   ├── README.md       #   tổng quan, quyết định đã chốt
 │   ├── REQUIREMENTS.md #   yêu cầu nguyên văn của đề seminar (nguồn chuẩn)
 │   ├── PLAN.md         #   kế hoạch theo 10 mục của đề + kịch bản demo + lịch
@@ -71,7 +73,7 @@ Các thư mục sản phẩm `slides/`, `demo/`, `cve/`, `evidence/`, `notes/` c
 - **Mức bằng chứng tách bạch** (S05): "có ghi vượt", "chương trình crash", "đã thay đổi địa chỉ trả về", "gọi được hàm thư viện với đối số đúng", "đạt mục tiêu challenge" là các nhận định khác nhau. Chỉ phát biểu điều đã kiểm chứng. Phân biệt gọi libc qua PLT với nhảy trực tiếp vào libc; không suy ra đã vượt ASLR chỉ từ demo có NX.
 - Sơ đồ stack **minh họa** không dùng để khẳng định offset của binary thật; offset phải **đo trên binary đang dùng**.
 - Nguồn tham khảo (tác giả, năm, URL) tên trong [vulagent/references/kien_thuc_can_hoc.md](vulagent/references/kien_thuc_can_hoc.md) được nêu từ trí nhớ, **chưa tra cứu**: kiểm tra lại trước khi đưa vào slide/báo cáo.
-- Với VulAgent: số trích từ paper là "tham chiếu lịch sử", không phải kết quả chạy cùng điều kiện; ghi rõ phiên bản paper (ACL 2026 là mốc chính, arXiv 2509.11523 để đối chiếu).
+- Với VulAgent: số trích từ paper là "tham chiếu lịch sử", không phải kết quả chạy cùng điều kiện; ghi rõ phiên bản paper. **Đề giao bản arXiv 2509.11523; nhóm lấy ACL 2026 làm mốc số liệu/định nghĩa** và giải thích khác biệt theo [source_audit §7.7](vulagent/docs/source_audit.md). Thí nghiệm bắt buộc tái hiện là các RQ có trong bản arXiv.
 - Thông tin CVE, phạm vi phiên bản, bản vá: xác nhận theo advisory của nhà cung cấp; các bản phân phối có thể backport.
 
 ## 5. An toàn và đạo đức
@@ -103,4 +105,4 @@ Mọi mốc cần review chéo ít nhất một người khác. Tên thành viê
 ## 8. Tiêu chuẩn hoàn thành
 
 - **S05:** mọi mục 1–10 của đề có chỗ trong slide; giải thích được ret2libc, quan hệ với buffer overflow và bảo vệ; demo tái sử dụng hàm thư viện chạy được ít nhất hai lần liên tiếp trên môi trường đã chốt; ảnh có chú thích; tổng thời gian 20–30 phút; checklist trong [seminar_S05/CHECKLIST.md](seminar_S05/CHECKLIST.md) xong.
-- **VulAgent:** người khác clone đúng commit, dùng key riêng, chạy theo README và tạo lại bảng từ kết quả thô; xem [vulagent/CHECKLIST.md](vulagent/CHECKLIST.md).
+- **VulAgent:** bám [vulagent/REQUIREMENTS.md](vulagent/REQUIREMENTS.md). Tiêu chí 3 (5đ): mỗi thí nghiệm của bài (RQ1–RQ5) hoặc có bảng số nhóm tự chạy, tính lại được từ kết quả thô, hoặc ghi rõ lý do không chạy; có demo một cặp và biện luận ưu/nhược. Tiêu chí 4 (1đ): một cải tiến hoặc dữ liệu mới có đối chứng cùng model, cùng ID. Người khác clone đúng commit, dùng key riêng, chạy theo README và tạo lại bảng; xem [vulagent/CHECKLIST.md](vulagent/CHECKLIST.md).

@@ -21,3 +21,7 @@ vulagent/upstream/
 # VulAgent: raw experiment outputs and downloaded datasets
 vulagent/results/raw/
 vulagent/data/
+
+# Mini seminar S01/S05: sản phẩm riêng, chỉ giữ ở máy (gỡ khỏi repo 2026-11-24; bản cũ còn trong lịch sử git tới commit trước đó)
+seminar_S01/
+seminar_S05/
