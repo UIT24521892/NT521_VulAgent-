@@ -1,0 +1,80 @@
+# docs/error_analysis.md — Phân tích kết quả lượt SEVEN bằng Claude Haiku
+
+Ngày: 2026-11-24. Lượt chạy: `results/raw/seven_claude_haiku/` (166 mẫu = 83 cặp, `claude-haiku-5-5`, 1 lượt, prompt nguyên bản của repo gốc, `max_tokens` 4096). Mọi số ở đây tính lại được, không gọi model:
+
+```bash
+D="upstream/VulAgent/Quickly reproduce the experiment/seven_test_with_idx_context_cleaned.jsonl"
+python3 scripts/metrics.py --gt "$D" --pred results/raw/seven_claude_haiku/predictions.jsonl --out results/tables/seven_claude_haiku
+python3 scripts/analyze_errors.py --gt "$D" --run results/raw/seven_claude_haiku --out results/tables/seven_claude_haiku.errors
+python3 scripts/show_trace.py results/raw/seven_claude_haiku/traces/79_L79.json
+```
+
+Số của bài báo là tham chiếu lịch sử (khác model, bài lấy trung bình 3 lượt), không phải chạy cùng điều kiện.
+
+## 1. RQ2 — so các backend trên SVEN (83 cặp)
+
+| Backend | Nguồn số | P-C | P-R | VPS | FPR | F1 | ACC |
+|---|---|---|---|---|---|---|---|
+| GPT-4o | bài báo (arXiv Table 2) | 26.51 | 6.02 | 20.49 | 55.42 | 65.62 | 60.20 |
+| DeepSeek v3.1 | bài báo | 30.12 | 9.64 | 20.48 | 31.30 | 56.58 | 60.20 |
+| Qwen3-235B | bài báo | 30.12 | 10.84 | 19.28 | 28.91 | 54.42 | 59.63 |
+| Qwen3-235B | nhóm tính lại từ output tác giả công bố | 30.12 | 10.84 | 19.28 | 28.92 | 54.42 | 59.64 |
+| **Claude Haiku 5.5** | **nhóm chạy pipeline của nhóm, 1 lượt** | **28.92** | **3.61** | **25.30** | **24.10** | **56.94** | **62.65** |
+
+Nhận xét: kết quả Haiku nằm trong cùng vùng với ba backend của bài (ACC 60–63, P-C 27–30) và nghiêng về phía "thận trọng" giống DeepSeek/Qwen3: FPR thấp, recall thấp (49.40%). Điều này phù hợp với kết luận RQ2 của bài rằng phương pháp giữ được hành vi qua các model; nó **không** chứng minh Haiku tốt hơn, vì chỉ có một lượt và 83 cặp (chênh 1 cặp ≈ 1.2 điểm P-C).
+
+## 2. RQ4 — theo CWE trên SVEN
+
+`robust` = (#đúng − #sai)/#mẫu (định nghĩa ở Figure 4 của bài). Cột "bài báo" là Table 4 arXiv (GPT-4o).
+
+| CWE | Mẫu | Prec | Rec | F1 | Acc | FPR | robust | Bài báo: Rec / FPR / Acc |
+|---|---|---|---|---|---|---|---|---|
+| CWE-089 | 40 | 0.667 | 0.600 | 0.632 | 0.650 | 0.300 | 0.300 | 1.000 / 0.800 / 0.600 |
+| CWE-125 | 30 | 0.625 | 0.667 | 0.645 | 0.633 | 0.400 | 0.267 | 0.733 / 0.600 / 0.567 |
+| CWE-078 | 22 | 0.600 | 0.273 | 0.375 | 0.545 | 0.182 | 0.091 | 0.636 / 0.455 / 0.591 |
+| CWE-476 | 16 | 0.750 | 0.375 | 0.500 | 0.625 | 0.125 | 0.250 | 0.875 / 0.625 / 0.625 |
+| CWE-416 | 14 | 0.667 | 0.286 | 0.400 | 0.571 | 0.143 | 0.143 | 0.571 / 0.286 / 0.643 |
+| CWE-022 | 12 | 0.600 | 0.500 | 0.545 | 0.583 | 0.333 | 0.167 | 0.667 / 0.667 / 0.500 |
+| CWE-787 | 12 | 0.667 | 0.667 | 0.667 | 0.667 | 0.333 | 0.333 | 0.667 / 0.333 / 0.667 |
+| CWE-079 | 10 | 1.000 | 0.400 | 0.571 | 0.700 | 0.000 | 0.400 | 0.400 / 0.200 / 0.600 |
+| CWE-190 | 10 | 1.000 | 0.400 | 0.571 | 0.700 | 0.000 | 0.400 | 0.800 / 0.400 / 0.700 |
+
+Nhận xét: accuracy theo CWE gần với bài (lệch nhiều nhất 0.1), nhưng cách đạt được khác: GPT-4o trong bài báo recall cao kèm FPR cao (CWE-089: 1.000 / 0.800), còn Haiku recall thấp kèm FPR thấp. `robust` dương ở cả 9 CWE, khớp nhận định của bài rằng VulAgent "giữ điểm dương trên mọi loại". Yếu nhất là CWE-078 (command injection) và CWE-416 (use-after-free), đúng hai nhóm bài xếp vào loại "khó lập giả thuyết / phụ thuộc context". Mỗi CWE chỉ 5–20 cặp nên từng ô có sai số lớn.
+
+## 3. 42 ca FN bị mất ở khâu nào
+
+| Nhóm | Số ca | idx |
+|---|---|---|
+| 0. Aggregator không giữ candidate nào | 7 | 11, 19, 27, 31, 95, 125, 147 |
+| 1. Có candidate nhưng lệch CWE so với nhãn | 7 | 13, 35, 43, 127, 131, 133, 137 |
+| 2. UnifiedPruner xóa issue đúng CWE khỏi danh sách | 6 | 15, 17, 45, 83, 93, 117 |
+| 3. UnifiedPruner đánh dấu `contradicted` → FinalValidator bác | 8 | 1, 29, 63, 69, 79, 113, 149, 153 |
+| 4. Output UnifiedPruner không parse được → FinalValidator bác | 6 | 5, 111, 115, 151, 159, 163 |
+| 5. UnifiedPruner không bác, FinalValidator tự bác | 8 | 21, 39, 47, 53, 61, 103, 121, 139 |
+
+**28/42 FN (nhóm 2–5) đã phát hiện đúng CWE rồi bị khâu kiểm chứng loại**; khâu phát hiện chỉ chịu trách nhiệm 14 ca. Ba cơ chế cụ thể đọc được từ trace:
+
+1. **Luật "một giả định bị bác thì bác cả đường".** Prompt FinalValidator của repo gốc có mục *Special Cases*: giả định nào bị Pruner đánh `contradicted` thì coi đường kích hoạt là không hợp lệ. Trên các issue ghép được, Pruner `contradicted` → Validator `no` ở 92/93 trường hợp. Luật này không phân biệt giả định **cần** cho lỗ hổng với giả định phụ. Ca điển hình **idx 79** (`add_input`, `"...VALUES('{}')".format(data)`, mã nguồn còn ghi chú "deliberate security flaw"): Pruner bác giả định A4 "driver cho chạy nhiều câu lệnh trong một `execute`" (đúng: pymysql mặc định không bật) và Validator bác luôn cả SQL injection, dù chèn vào một câu lệnh vẫn thực hiện được.
+2. **Thiếu bằng chứng bị coi như bị bác.** Dữ liệu ở mức hàm, không có hàm gọi. Ở **idx 61** (`reportMatch`, `"VALUES ('%s', '%s')" % (winner, loser)`) Validator viết rằng "không có bằng chứng tham số do kẻ tấn công điều khiển" rồi bác; context của mẫu này là thông báo tải lỗi 404. **idx 47** bị bác vì giá trị "đến từ cấu hình do admin kiểm soát". Bài báo mô tả ngược lại: chỉ loại khi có bằng chứng mâu thuẫn, thiếu bằng chứng thì giữ ở trạng thái chưa chắc.
+3. **Pruner tự xóa candidate, không để lại lý do.** Prompt yêu cầu Pruner gắn trạng thái cho giả định, nhưng ở 9 mẫu (5 FN, 4 TN) nó trả `"confirmed_issues": []`. **idx 45** (`"insert into comment_like values(%d,%d);" % (userid, commentid)`) mất theo cách này; trace không có lý do để kiểm tra lại.
+
+**Phát hiện phụ — output Pruner bị cắt.** 40/144 output UnifiedPruner không parse được, 39 trong số đó kết thúc giữa câu ở độ dài 6–8 nghìn ký tự, phù hợp với giới hạn `max_tokens` 4096 (pipeline chưa lưu `stop_reason` nên chưa khẳng định được). Văn bản cụt vẫn được chuyển nguyên cho FinalValidator như repo gốc làm. 40 ca này rải trên TP 14, FP 7, TN 12, FN 7, nên chưa thấy nó lệch hẳn về một phía, nhưng Validator đã quyết định trên báo cáo thiếu ở 28% số mẫu có candidate. Cùng cơ chế với 28 ca FinalValidator hỏng JSON trong output Qwen3 công bố ([source_audit §7.6](source_audit.md)).
+
+**Giới hạn của phân tích này.** Nhãn lấy theo commit vá ở mức hàm; có ca lập luận của model đứng được theo context (idx 1: `validateClient` trong context đã chặn ký tự ngoài chữ-số), nên không phải FN nào cũng là model sai. Nhóm 1 chỉ so số CWE. Chưa đọc tay đủ 42 ca; ba cơ chế trên rút từ 8 ca đã đọc (1, 5, 45, 47, 61, 79, 111, 115) cộng thống kê toàn bộ.
+
+## 4. Ba ca dùng cho demo và báo cáo
+
+| Vai trò | idx | Mã | Điều trace cho thấy |
+|---|---|---|---|
+| Cặp cơ bản (TP + TN) | 71 / 72 | `retrieve_videos_from_playlist`, SQL qua `.format()` so với truy vấn tham số hóa | 71: 4 agent → 1 candidate CWE-89 → giữ. 72: không có candidate. Hai mẫu tổng ~36 giây, chạy trực tiếp được |
+| **Candidate bị guard chặn** (phương pháp làm đúng việc của nó) | 143 / 144 | `rds_tcp_kill_sock` (Linux, CWE-476); bản vá thêm `if (tc->t_sock)` | 143: giữ CWE-476 vì "không có kiểm tra `tc->t_sock` trước khi dereference". 144: vẫn nêu candidate CWE-476 nhưng bác với lý do "kiểm tra NULL ở L21 chặn dereference" |
+| Như trên, ca bộ nhớ | 165 / 166 | `RemoveICCProfileFromResourceBlock` (ImageMagick, CWE-787); bản vá thêm điều kiện biên trước `CopyMagickMemory` | 165: giữ CWE-787 và CWE-125. 166: bác cả hai, dẫn guard ở L38 |
+| **FN do khâu kiểm chứng** (nhược điểm) | 79 | `add_input`, SQL injection có chủ ý | Phát hiện đúng, bị bác vì một giả định phụ (mục 3, cơ chế 1) |
+
+Trong 24 cặp đoán đúng cả hai vế, chỉ 5 cặp có candidate đúng CWE ở vế fixed rồi bị bác (7, 101, 143, 161, 165); các cặp còn lại vế fixed không phát sinh candidate đúng CWE.
+
+## 5. Hệ quả cho biện luận và cho phần cải tiến
+
+- **Ưu điểm thấy được:** FPR 24.10% và P-R 3.61%; khi bản vá thêm guard rõ ràng, khâu kiểm chứng trích đúng dòng guard để bác (143/144, 165/166).
+- **Nhược điểm thấy được:** recall 49.40%; 2/3 số FN là lỗ hổng đã được phát hiện rồi bị loại; hai trong ba cơ chế loại nhầm trái với mô tả trong bài ("thiếu bằng chứng thì giữ").
+- **Chỗ sửa cho tiêu chí 4** (chi tiết ở [PLAN.md](../PLAN.md) §0.2): (a) chỉ bác đường khi giả định bị bác là điều kiện cần để tới sink; (b) thiếu bằng chứng về nguồn dữ liệu thì giữ, không bác; (c) Pruner không được xóa issue; (d) nâng `max_tokens` cho Pruner và lưu `stop_reason`. Trần cải thiện về lý thuyết: 22 FN ở nhóm 2, 3, 5 (thêm 6 ca nhóm 4 nếu sửa cắt cụt); cái giá phải đo là FPR tăng trên 63 TN, trong đó 48 TN hiện được loại ở chính khâu này.

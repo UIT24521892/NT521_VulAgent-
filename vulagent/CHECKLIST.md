@@ -13,16 +13,16 @@ Xếp theo tiêu chí chấm ở [REQUIREMENTS.md](REQUIREMENTS.md); trạng th�
 - [x] RQ1: VulAgent trên SEVEN đủ 166 mẫu, 1 lượt (2026-11-24).
 - [ ] RQ1: baseline CoT cùng model, cùng ID.
 - [ ] RQ1: PrimeVul (toàn bộ hoặc tập con có quy tắc).
-- [ ] RQ2: bảng so backend (Qwen3/GPT-4o công bố tính lại + Haiku).
+- [x] RQ2: bảng so backend (Qwen3 công bố tính lại + Haiku) — `docs/error_analysis.md` §1.
 - [ ] RQ3: SEVEN không context.
-- [ ] RQ4: bảng per-CWE.
+- [x] RQ4: bảng per-CWE — `docs/error_analysis.md` §2.
 - [ ] RQ5 và ablation ACL: ghi rõ làm hay không và vì sao.
 - [ ] Kịch bản demo + video dự phòng + một ca candidate bị guard chặn.
 - [ ] Error analysis ≥ 3 ca (TP, FP bị loại, FN) + ưu/nhược + threats to validity.
 - [ ] Báo cáo nêu phần nhóm tự hiện thực, phần dùng lại, mọi khác biệt với bài (model, số lượt, tập mẫu).
 
 ## Tiêu chí 4 (1đ): cải tiến
-- [ ] Đọc 35 trace FN bị loại ở khâu kiểm chứng, chốt chỗ sửa.
+- [x] Phân loại 42 FN theo khâu, chốt ba chỗ sửa — `docs/error_analysis.md` §3 (đọc tay 8 ca + thống kê toàn bộ).
 - [ ] Ghi giả thuyết + tiêu chí thành công trước khi chạy.
 - [ ] Chạy bản cải tiến trên cùng 166 ID, so với lượt gốc.
 

@@ -1,0 +1,76 @@
+{
+  "run": "results/raw/seven_claude_haiku",
+  "confusion": {
+    "FP": 20,
+    "TP": 41,
+    "TN": 63,
+    "FN": 42
+  },
+  "fn_groups": {
+    "0. Aggregator không giữ candidate nào": [
+      11,
+      19,
+      27,
+      31,
+      95,
+      125,
+      147
+    ],
+    "1. có candidate nhưng lệch CWE so với nhãn": [
+      13,
+      35,
+      43,
+      127,
+      131,
+      133,
+      137
+    ],
+    "2. UnifiedPruner xóa issue đúng CWE khỏi danh sách": [
+      15,
+      17,
+      45,
+      83,
+      93,
+      117
+    ],
+    "3. UnifiedPruner đánh dấu contradicted → FinalValidator bác": [
+      1,
+      29,
+      63,
+      69,
+      79,
+      113,
+      149,
+      153
+    ],
+    "4. output UnifiedPruner không parse được → FinalValidator bác": [
+      5,
+      111,
+      115,
+      151,
+      159,
+      163
+    ],
+    "5. UnifiedPruner không bác, FinalValidator tự bác": [
+      21,
+      39,
+      47,
+      53,
+      61,
+      103,
+      121,
+      139
+    ]
+  },
+  "pruner_output": {
+    "calls": 144,
+    "unparseable": 40,
+    "unparseable_ending_mid_text": 39
+  },
+  "issue_pruner_vs_final": {
+    "Pruner contradicted / Validator no": 92,
+    "Pruner contradicted / Validator yes": 1,
+    "Pruner không bác / Validator no": 112,
+    "Pruner không bác / Validator yes": 46
+  }
+}

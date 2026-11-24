@@ -69,6 +69,45 @@ def read_ground_truth(path: Path):
     return gt, order, dups
 
 
+def read_cwe(path: Path):
+    """cwe[idx] = danh sách CWE (chuẩn hóa 'CWE-089') đọc từ trường `cwe` của ground truth.
+    Trường có thể là chuỗi ('cwe-089') hoặc danh sách dạng chuỗi ("['CWE-703']").
+    Mẫu thiếu trường thì không có trong kết quả."""
+    out = {}
+    with path.open("r", encoding="utf-8", errors="ignore") as f:
+        for raw in f:
+            try:
+                obj = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(obj, dict) or "idx" not in obj or not obj.get("cwe"):
+                continue
+            names = re.findall(r"cwe-\d+", str(obj["cwe"]), flags=re.I)
+            if names:
+                out[int(obj["idx"])] = sorted({n.upper() for n in names})
+    return out
+
+
+def per_cwe_metrics(preds, gt, cwe, pairs):
+    """Bảng theo CWE (RQ4). Mẫu mang nhiều CWE được tính vào từng CWE của nó.
+    `robust` = (#đúng − #sai)/#mẫu, định nghĩa ở chú thích Figure 4 của paper."""
+    groups = {}
+    for idx, names in cwe.items():
+        for n in names:
+            groups.setdefault(n, set()).add(idx)
+    table = {}
+    for name, ids in groups.items():
+        sm = sample_metrics({i: p for i, p in preds.items() if i in ids}, gt)
+        sub = [(v, fx) for v, fx in pairs if v in ids and fx in ids]
+        pm = pair_metrics(sub, preds, gt)["skip"]
+        sm["samples"] = len(ids)
+        sm["robust"] = ((sm["TP"] + sm["TN"] - sm["FP"] - sm["FN"]) / sm["evaluated"]) if sm["evaluated"] else 0.0
+        sm["pairs"] = pm["pairs_evaluated"]
+        sm["P_C"], sm["P_R"] = pm["P_C"], pm["P_R"]
+        table[name] = sm
+    return dict(sorted(table.items(), key=lambda kv: (-kv[1]["samples"], kv[0])))
+
+
 # ───────── Đọc dự đoán ─────────
 def read_predictions_file(path: Path):
     """Đọc file kiểu results.txt: mỗi dòng 'idx<sep>pred' (sep = tab/phẩy/cách)
@@ -247,13 +286,15 @@ def print_report(sm, pm, coverage, warns):
             print(f"  ⚠ {w}")
 
 
-def write_outputs(out_prefix, sm, pm, coverage, pairs, preds, gt, warns, unknown=None):
+def write_outputs(out_prefix, sm, pm, coverage, pairs, preds, gt, warns, unknown=None, per_cwe=None):
     out_prefix = Path(out_prefix)
     out_prefix.parent.mkdir(parents=True, exist_ok=True)
     summary = {"sample_level": sm, "pair_level": pm,
                "coverage": coverage, "warnings": warns}
     if unknown is not None:
         summary["unknown_idx"] = sorted(unknown)
+    if per_cwe:
+        summary["per_cwe"] = per_cwe
     (out_prefix.with_suffix(".json")).write_text(
         json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
     with out_prefix.with_suffix(".pairs.csv").open("w", newline="", encoding="utf-8") as f:
@@ -301,6 +342,12 @@ def selftest():
     pm2 = pair_metrics(pairs, preds2, gt)
     assert pm2["skip"]["pairs_evaluated"] == 2 and pm2["skip"]["pairs_missing"] == 1
     assert pm2["count_wrong"]["pairs_evaluated"] == 3
+    # per-CWE: cặp (1,2) thuộc CWE-1, hai cặp còn lại thuộc CWE-2.
+    pc = per_cwe_metrics(preds, gt, {1: ["CWE-1"], 2: ["CWE-1"], 3: ["CWE-2"], 4: ["CWE-2"],
+                                     5: ["CWE-2"], 6: ["CWE-2"]}, pairs)
+    assert (pc["CWE-1"]["TP"], pc["CWE-1"]["TN"], pc["CWE-1"]["P_C"]) == (1, 1, 1), pc
+    assert (pc["CWE-2"]["TP"], pc["CWE-2"]["FP"], pc["CWE-2"]["FN"], pc["CWE-2"]["P_R"]) == (1, 2, 1, 1), pc
+    assert abs(pc["CWE-2"]["robust"] - (1 - 3) / 4) < 1e-9, pc
     print("✅ self-test PASS")
 
 
@@ -356,8 +403,17 @@ def main():
     sm = sample_metrics(preds, gt)
     pm = pair_metrics(pairs, preds, gt)
 
+    per_cwe = per_cwe_metrics(preds, gt, read_cwe(args.gt), pairs)
+
     print_report(sm, pm, coverage, warns)
-    write_outputs(args.out, sm, pm, coverage, pairs, preds, gt, warns, unknown if args.pred else None)
+    if per_cwe:
+        print("\n==== Theo CWE (RQ4) ====")
+        print(f"  {'CWE':<9}{'mẫu':>5}{'Prec':>7}{'Rec':>7}{'F1':>7}{'Acc':>7}{'FPR':>7}{'robust':>8}{'P-C':>5}{'P-R':>5}")
+        for name, m in per_cwe.items():
+            print(f"  {name:<9}{m['samples']:>5}{m['precision']:>7.3f}{m['recall']:>7.3f}{m['f1']:>7.3f}"
+                  f"{m['accuracy']:>7.3f}{m['fpr']:>7.3f}{m['robust']:>8.3f}{m['P_C']:>5}{m['P_R']:>5}")
+    write_outputs(args.out, sm, pm, coverage, pairs, preds, gt, warns,
+                  unknown if args.pred else None, per_cwe)
 
 
 if __name__ == "__main__":

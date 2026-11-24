@@ -44,8 +44,8 @@ project_521/
 │   ├── CHECKLIST.md
 │   ├── experiment_manifest.yaml  # khóa giao thức thực nghiệm, số liệu paper, shasum dữ liệu
 │   ├── .env.example    #   mẫu biến môi trường (không chứa key)
-│   ├── docs/           #   source_audit, reproduction_contract, reproduction_plan (C0–C5)
-│   ├── scripts/        #   run_pipeline.py (chạy/phát lại), show_trace.py, metrics.py (sample + pair + VPS)
+│   ├── docs/           #   source_audit, reproduction_contract, reproduction_plan (C0–C5), error_analysis (RQ2/RQ4, FN theo khâu, ca demo)
+│   ├── scripts/        #   run_pipeline.py (chạy/phát lại), show_trace.py, metrics.py (sample + pair + VPS + per-CWE), analyze_errors.py (FN theo khâu)
 │   ├── src/            #   pipeline.py, llm.py (backend replay/api), schema.py (validator output)
 │   ├── tests/          #   test_pipeline.py (unittest, không cần mạng)
 │   ├── configs/        #   danh sách ID cố định (demo, R3)
