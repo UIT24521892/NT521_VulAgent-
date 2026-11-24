@@ -6,7 +6,7 @@
 
 ```bash
 cd vulagent
-python3 -m unittest discover -s tests            # 16 test
+python3 -m unittest discover -s tests
 U=upstream/VulAgent
 python3 scripts/run_pipeline.py --data "$U/Dataset/SEVEN_context/test_with_idx_context_cleaned.jsonl" \
     --replay-dir "$U/VulAgent_Seven/With contetxt/Qwen3" --out results/raw/replay_seven_qwen3
@@ -16,6 +16,27 @@ python3 scripts/show_trace.py results/raw/replay_seven_qwen3/traces/71_L71.json 
 ```
 
 `--backend replay` phát lại output từng agent mà repo gốc đã công bố; đó **không** phải kết quả nhóm chạy model. Chạy model thật: `--backend api --confirm-paid` cùng `--limit`/`--ids`, sau khi nhóm chốt key và ngân sách (xem [docs/reproduction_plan.md](docs/reproduction_plan.md) C1).
+
+## Kiểm chứng tĩnh v2 trên SEVEN
+
+Giao thức và ngưỡng quyết định đã khóa trong [PLAN.md §0.2](PLAN.md#02-tiêu-chí-4-1đ-cải-tiến-có-đối-chứng). V2 dùng cùng hàm, context và model với lượt Haiku đối chứng. Chế độ này đọc CWE và vị trí của candidate từ đầu ra Aggregator đã lưu. Pruner ghi nhận bằng chứng theo ID và Validator xét toàn bộ danh sách gốc.
+
+Từ thư mục `vulagent/`, dùng môi trường Python có SDK Anthropic. Pilot cần bản đối chứng có đủ `run_meta.json` và `predictions.jsonl`. Sau khi duyệt ngân sách, chạy và chấm như sau.
+
+```bash
+DATA='upstream/VulAgent/Quickly reproduce the experiment/seven_test_with_idx_context_cleaned.jsonl'
+BASE=results/raw/seven_claude_haiku
+PILOT=results/raw/seven_claude_haiku_verification_v2_pilot
+
+python3 scripts/run_pipeline.py --data "$DATA" --out "$PILOT" \
+    --backend api --provider anthropic --confirm-paid \
+    --verification-v2-from "$BASE" --ids-file configs/seven_verification_v2_pilot_ids.txt
+
+python3 scripts/compare_verification.py --gt "$DATA" --baseline "$BASE" --run "$PILOT" \
+    --pilot --out results/tables/seven_claude_haiku_verification_v2_pilot.json
+```
+
+Chạy lại cùng lệnh và cùng thư mục để tiếp tục các dòng còn thiếu. Mỗi trace ghi `stop_reason`, xem qua `scripts/show_trace.py`. Nếu pilot đạt và lượt đầy đủ được duyệt, đổi thư mục kết quả, dùng `--limit 166` thay cho `--ids-file`, rồi chấm với `compare_verification.py` ở chế độ mặc định.
 
 - **Paper:** đề giao bản [arXiv 2509.11523](https://arxiv.org/abs/2509.11523); nhóm lấy bản [Findings of ACL 2026](https://aclanthology.org/2026.findings-acl.928/) làm mốc số liệu và định nghĩa, khác biệt giữa hai bản ở [docs/source_audit.md](docs/source_audit.md) §7.7. Mã công khai: https://github.com/HotFrom/VulAgent
 - **Dữ liệu:** PrimeVul, SVEN — xác định đường dẫn, phiên bản, giấy phép, split thực tế từ nguồn chính thức trước khi tải.

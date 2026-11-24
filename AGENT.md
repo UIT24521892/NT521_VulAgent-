@@ -45,10 +45,11 @@ project_521/
 │   ├── experiment_manifest.yaml  # khóa giao thức thực nghiệm, số liệu paper, shasum dữ liệu
 │   ├── .env.example    #   mẫu biến môi trường (không chứa key)
 │   ├── docs/           #   source_audit, reproduction_contract, reproduction_plan (C0–C5), error_analysis (RQ2/RQ4, FN theo khâu, ca demo)
-│   ├── scripts/        #   run_pipeline.py (chạy/phát lại), show_trace.py, metrics.py (sample + pair + VPS + per-CWE), analyze_errors.py (FN theo khâu)
+│   ├── scripts/        #   run_pipeline.py, show_trace.py, metrics.py, analyze_errors.py, compare_verification.py (chấm cải tiến v2)
 │   ├── src/            #   pipeline.py, llm.py (backend replay/api), schema.py (validator output)
 │   ├── tests/          #   test_pipeline.py (unittest, không cần mạng)
-│   ├── configs/        #   danh sách ID cố định (demo, R3)
+│   ├── configs/        #   danh sách ID cố định (demo, R3, pilot kiểm chứng v2)
+│   ├── prompts_v2/     #   prompt Pruner và Validator của nhóm cho kiểm chứng tĩnh v2
 │   ├── results/        #   tables/ (bảng tính lại được); raw/ (gitignore)
 │   ├── data/ slides/   #   đã tạo, còn rỗng
 │   ├── upstream/       #   clone repo gốc HotFrom/VulAgent (gitignore; có key nhúng, không dùng, không commit)

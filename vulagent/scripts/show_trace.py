@@ -25,16 +25,25 @@ def show(path: str) -> None:
           + (f", fixture={prov.get('fixture')}" if prov.get("fixture") else "")
           + (f", model={prov.get('model')}" if prov.get("model") else ""))
     c = r["stage_counts"]
-    print(f"  Số lượng qua các bước: {c['detection_agents']} agent phát hiện → "
-          f"{c['candidates']} candidate → {c['retained']} giả thuyết được giữ")
-    print(f"  1) MetaAgent chọn: {', '.join(r['active_agents']) or '(không có)'}")
-    print("  2-3) Candidate sau Aggregator:")
+    v2 = prov.get("variant") == "verification_v2"
+    if v2:
+        print(f"  {c['candidates']} candidate từ đối chứng → {c['retained']} candidate được giữ")
+        print("  Candidate theo ID trong lượt kiểm chứng:")
+    else:
+        print(f"  Số lượng qua các bước: {c['detection_agents']} agent phát hiện → "
+              f"{c['candidates']} candidate → {c['retained']} giả thuyết được giữ")
+        print(f"  1) MetaAgent chọn: {', '.join(r['active_agents']) or '(không có)'}")
+        print("  2-3) Candidate sau Aggregator:")
     for i, cand in enumerate(r["candidates"], 1):
         desc = cand.get("description")
         desc = desc[0] if isinstance(desc, list) and desc else desc
         print(f"    [{i}] {cand.get('cwe')} tại dòng {cand.get('code_line')}")
-        print(wrap("mô tả", desc))
-    print("  4-6) Phán quyết FinalValidator (sau TriggerPlanner và UnifiedPruner):")
+        if desc:
+            print(wrap("mô tả", desc))
+    if v2:
+        print("  Kiểm chứng tĩnh v2 trên candidate đối chứng:")
+    else:
+        print("  4-6) Phán quyết FinalValidator (sau TriggerPlanner và UnifiedPruner):")
     for i, it in enumerate(r["issues"], 1):
         print(f"    [{i}] {it.get('cwe')} → {it['verdict'].upper()}")
         if it.get("trigger_path"):
@@ -46,6 +55,9 @@ def show(path: str) -> None:
         print(f"  LỖI tại {e['stage']} ({e['kind']}): {e['message']}")
     for w in r.get("warnings", []):
         print(f"  cảnh báo: {w}")
+    for call in r.get("trace", []):
+        if call.get("stop_reason"):
+            print(f"  {call['agent']} stop_reason={call['stop_reason']}")
     cost = r["cost"]
     print(f"  Chi phí: {cost['llm_calls']} lời gọi; {cost['prompt_chars']} ký tự prompt, "
           f"{cost['output_chars']} ký tự output; token đo được: "

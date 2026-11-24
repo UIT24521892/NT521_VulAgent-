@@ -23,8 +23,10 @@ Xếp theo tiêu chí chấm ở [REQUIREMENTS.md](REQUIREMENTS.md); trạng th�
 
 ## Tiêu chí 4 (1đ): cải tiến
 - [x] Phân loại 42 FN theo khâu, chốt ba chỗ sửa — `docs/error_analysis.md` §3 (đọc tay 8 ca + thống kê toàn bộ).
-- [ ] Ghi giả thuyết + tiêu chí thành công trước khi chạy.
-- [ ] Chạy bản cải tiến trên cùng 166 ID, so với lượt gốc.
+- [x] Ghi giả thuyết + tiêu chí thành công trước khi chạy — `PLAN.md` §0.2.
+- [x] Hiện thực hai prompt kiểm chứng tĩnh, giữ candidate theo ID, tăng trần Pruner và ghi `stop_reason`.
+- [x] Hoàn tất pilot 28 FN + 28 TN theo danh sách cố định và chấm điều kiện mở rộng.
+- [x] Ghi nhận kết quả âm trước lượt 166 mẫu vì 19 TN chuyển sai, vượt ngưỡng 2.
 
 ## Tái lập và an toàn
 - [ ] Tập mẫu, model, prompt hash, ngày chạy, chi phí của mỗi lượt nằm trong `run_meta.json`/manifest.

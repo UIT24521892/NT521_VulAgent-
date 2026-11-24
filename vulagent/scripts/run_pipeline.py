@@ -22,23 +22,27 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import fcntl
+import hashlib
 import json
 import os
 import re
 import subprocess
 import sys
 from collections import Counter
+from contextlib import ExitStack
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
 from llm import AnthropicBackend, OpenAICompatBackend, ReplayBackend, LLMError  # noqa: E402
-from pipeline import PromptStore, Sample, analyse              # noqa: E402
+from pipeline import V2_PRUNER_MAX_TOKENS, PromptStore, Sample, analyse, verify_candidates  # noqa: E402
 from schema import validate_prototype_output                   # noqa: E402
 
 UPSTREAM = ROOT / "upstream" / "VulAgent"
 DEFAULT_PROMPTS = UPSTREAM / "Quickly reproduce the experiment" / "prompt_template"
+VERIFICATION_PROMPTS = ROOT / "prompts_v2"
 FIXTURE_IDX = re.compile(r"_(\d+)_full\.json$")
 
 
@@ -83,7 +87,38 @@ def upstream_commit() -> str | None:
         return None
 
 
+def load_verification_baseline(path: Path, data: Path, provider: str, model: str) -> tuple[dict, str]:
+    meta = json.loads((path / "run_meta.json").read_text(encoding="utf-8"))
+    if (meta.get("backend"), meta.get("provider"), meta.get("model"), meta.get("skip")) != (
+            "api", provider, model, []):
+        raise ValueError("đối chứng phải dùng cùng provider/model và có context")
+    baseline_data = Path(meta["data"])
+    if data.resolve() not in (baseline_data.resolve(), (ROOT / baseline_data).resolve()):
+        raise ValueError("--data phải trỏ tới file dữ liệu của lượt đối chứng")
+
+    raw = (path / "predictions.jsonl").read_bytes()
+    baseline = {}
+    for line in raw.splitlines():
+        if not line.strip():
+            continue
+        rec = json.loads(line)
+        if rec["line"] in baseline or rec["pred"] not in (0, 1) or rec.get("error"):
+            raise ValueError("đối chứng có dòng trùng hoặc phán quyết chưa xác định")
+        if rec["provenance"].get("model") != model:
+            raise ValueError("đối chứng có mẫu dùng model khác")
+        candidates = rec["candidates"]
+        if not isinstance(candidates, list) or any(not isinstance(c, dict) for c in candidates):
+            raise ValueError("đối chứng có danh sách candidate sai cấu trúc")
+        baseline[rec["line"]] = rec
+    return baseline, hashlib.sha256(raw).hexdigest()
+
+
 def main() -> int:
+    with ExitStack() as stack:
+        return run_pipeline(stack)
+
+
+def run_pipeline(stack: ExitStack) -> int:
     ap = argparse.ArgumentParser(description="Chạy pipeline VulAgent của nhóm.")
     ap.add_argument("--data", type=Path, required=True, help="File .jsonl (idx, func, ...)")
     ap.add_argument("--out", type=Path, required=True, help="Thư mục kết quả (vd results/raw/<tên>)")
@@ -92,7 +127,9 @@ def main() -> int:
                     help="Nhà cung cấp cho --backend api: dashscope (Qwen, đúng paper) hoặc "
                          "anthropic (Claude, thí nghiệm backend khác)")
     ap.add_argument("--replay-dir", type=Path, help="Thư mục chứa *_full.json của repo gốc")
-    ap.add_argument("--prompts", type=Path, default=DEFAULT_PROMPTS, help="Thư mục prompt template")
+    ap.add_argument("--prompts", type=Path, help="Thư mục prompt template")
+    ap.add_argument("--verification-v2-from", type=Path, metavar="BASELINE_DIR",
+                    help="Kiểm chứng tĩnh v2 trên candidate đã lưu của lượt đối chứng")
     ap.add_argument("--ids", help="Chỉ chạy các idx này (phân tách bằng dấu phẩy)")
     ap.add_argument("--ids-file", type=Path, help="File chứa idx, mỗi dòng một idx")
     ap.add_argument("--limit", type=int, help="Chỉ chạy N mẫu đầu (sau khi lọc --ids)")
@@ -103,8 +140,13 @@ def main() -> int:
     ap.add_argument("--confirm-paid", action="store_true", help="Xác nhận gọi API tốn phí")
     args = ap.parse_args()
 
-    if not args.prompts.is_dir():
-        ap.error(f"không thấy thư mục prompt: {args.prompts}")
+    if args.verification_v2_from and (
+            args.backend != "api" or args.skip or args.prompts or args.no_upstream_quirks):
+        ap.error("--verification-v2-from cần --backend api và cấu hình v2 mặc định có context")
+    prompt_dir = (VERIFICATION_PROMPTS if args.verification_v2_from
+                  else args.prompts or DEFAULT_PROMPTS)
+    if not prompt_dir.is_dir():
+        ap.error(f"không thấy thư mục prompt: {prompt_dir}")
 
     wanted = None
     if args.ids:
@@ -134,9 +176,57 @@ def main() -> int:
             print(f"Không khởi tạo được backend API ({args.provider}): {e}", file=sys.stderr)
             return 2
 
-    prompts = PromptStore(args.prompts)
+    prompts = PromptStore(prompt_dir)
+    verification = None
+    baseline = {}
+    records = read_records(args.data)
+    if args.verification_v2_from:
+        try:
+            baseline, baseline_hash = load_verification_baseline(
+                args.verification_v2_from, args.data, args.provider, api_backend.model)
+            selected = [(line, rec) for line, rec in records
+                        if wanted is None or str(rec["idx"]) in wanted]
+            if wanted is not None and wanted != {str(rec["idx"]) for _, rec in selected}:
+                raise ValueError("danh sách ID có mẫu ngoài tập dữ liệu")
+            if args.limit is not None and args.limit <= 0:
+                raise ValueError("--limit phải dương")
+            records = selected[:args.limit]
+            if not records or any(
+                    line not in baseline or str(rec["idx"]) != str(baseline[line]["idx"])
+                    for line, rec in records):
+                raise ValueError("có mẫu thiếu đối chứng cùng ID và dòng dữ liệu")
+        except (OSError, KeyError, TypeError, ValueError) as e:
+            ap.error(f"không đọc được đối chứng v2: {e}")
+        verification = {
+            "variant": "verification_v2", "baseline_predictions_sha256": baseline_hash,
+            "data_sha256": hashlib.sha256(args.data.read_bytes()).hexdigest(),
+            "selection": [[line, str(rec["idx"])] for line, rec in records],
+            "provider": args.provider, "model": api_backend.model,
+            "effort": getattr(api_backend, "effort", None),
+            "pruner_max_tokens": V2_PRUNER_MAX_TOKENS,
+            "validator_max_tokens": api_backend.max_tokens,
+            "prompt_sha256": prompts.sha256_all(),
+        }
+
     (args.out / "traces").mkdir(parents=True, exist_ok=True)
     pred_path = args.out / "predictions.jsonl"
+    config_path = args.out / "verification_config.json"
+    if verification is not None:
+        lock = stack.enter_context((args.out / ".verification.lock").open("a"))
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            ap.error("lượt v2 này đang chạy trong một tiến trình khác")
+        if config_path.exists():
+            if json.loads(config_path.read_text(encoding="utf-8")) != verification:
+                ap.error("cấu hình v2 khác lượt trước, hãy dùng thư mục --out mới")
+        elif pred_path.exists():
+            ap.error("thư mục --out đã có dự đoán của lượt khác")
+        else:
+            config_path.write_text(json.dumps(verification, indent=2), encoding="utf-8")
+    elif config_path.exists():
+        ap.error("thư mục --out dành cho lượt verification_v2")
+
     done = set()
     if pred_path.exists():   # chạy tiếp: bỏ qua dòng dữ liệu đã có kết quả
         done = {json.loads(l)["line"] for l in pred_path.read_text(encoding="utf-8").splitlines() if l.strip()}
@@ -147,7 +237,7 @@ def main() -> int:
     n_run = 0
 
     with pred_path.open("a", encoding="utf-8") as out:
-        for line_no, rec in read_records(args.data):
+        for line_no, rec in records:
             sid = str(rec["idx"])
             if wanted is not None and sid not in wanted:
                 continue
@@ -173,8 +263,13 @@ def main() -> int:
                 backend = api_backend
                 provenance["model"] = backend.model
 
-            result = analyse(Sample.from_record(rec), backend, prompts,
-                             upstream_quirks=not args.no_upstream_quirks, skip=tuple(args.skip))
+            sample = Sample.from_record(rec)
+            if verification is not None:
+                result = verify_candidates(sample, backend, prompts, baseline[line_no]["candidates"])
+                provenance["variant"] = verification["variant"]
+            else:
+                result = analyse(sample, backend, prompts,
+                                 upstream_quirks=not args.no_upstream_quirks, skip=tuple(args.skip))
             result["line"] = line_no
             result["idx"] = rec["idx"]
             result["provenance"] = provenance
@@ -222,6 +317,8 @@ def main() -> int:
         "replay": {"no_fixture": no_fixture, "multiple_fixtures": multi_fixture,
                    "differs_from_upstream": upstream_diff} if args.backend == "replay" else None,
     }
+    if verification is not None:
+        meta["verification"] = verification
     (args.out / "run_meta.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
 
     print(f"Đã chạy {n_done} mẫu ({args.backend}). Quyết định: {dict(decisions)}")

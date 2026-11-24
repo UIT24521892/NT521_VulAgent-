@@ -41,6 +41,9 @@ VALIDATOR = "FinalValidatorAgent"
 # Repo gốc dùng 2 agent này khi không parse được output MetaAgent.
 META_FALLBACK = ["AnalyzerAgent", "BehaviorAnalyzerAgent"]
 PIPELINE_STAGES = (META, AGGREGATOR, PLANNER, PRUNER, VALIDATOR)
+V2_PRUNER_MAX_TOKENS = 8192
+_TRUNCATED = {"length", "max_tokens"}
+_REJECTION_BASES = {"necessary_condition_contradicted", "all_paths_guarded"}
 
 
 # ───────────────────────── Dữ liệu vào ─────────────────────────
@@ -126,7 +129,6 @@ def _sha(s: str) -> str:
 @dataclass
 class _Run:
     backend: Backend
-    prompts: PromptStore
     trace: list = field(default_factory=list)
     warnings: list = field(default_factory=list)
     calls: int = 0
@@ -137,17 +139,20 @@ class _Run:
     tokens_measured: bool = True
     latency_s: float = 0.0
 
-    def call(self, agent: str, prompt: str) -> str:
+    def call(self, agent: str, prompt: str, *, max_tokens: int | None = None) -> str:
         self.calls += 1
         self.prompt_chars += len(prompt)
         entry = {"agent": agent, "prompt_sha256": _sha(prompt), "prompt_chars": len(prompt)}
         self.trace.append(entry)
         try:
-            res = self.backend.complete(agent, prompt)
+            res = (self.backend.complete(agent, prompt, max_tokens=max_tokens)
+                   if max_tokens is not None else self.backend.complete(agent, prompt))
         except LLMError as e:
             entry["error"] = str(e)
+            entry["stop_reason"] = e.stop_reason
             raise
         entry["output"] = res.text
+        entry["stop_reason"] = res.stop_reason
         self.output_chars += len(res.text)
         self.latency_s += res.latency_s
         if res.prompt_tokens is None or res.completion_tokens is None:
@@ -185,6 +190,17 @@ def _issues_of(obj: Any) -> list | None:
     return None
 
 
+def _new_record(sample: Sample) -> dict:
+    return {
+        "schema_version": SCHEMA_VERSION, "id": sample.id,
+        "decision": "unknown", "cwe_suspected": [], "sink": None,
+        "hypothesis_condition": None, "trigger_path": None, "evidence_or_guard": None,
+        "active_agents": [], "candidates": [], "issues": [],
+        "stage_counts": {"detection_agents": 0, "candidates": 0, "retained": 0},
+        "error": None,
+    }
+
+
 def analyse(sample: Sample, backend: Backend, prompts: PromptStore,
             upstream_quirks: bool = True, skip: tuple = ()) -> dict:
     """Chạy pipeline cho một mẫu. Luôn trả bản ghi (không ném lỗi LLM ra ngoài).
@@ -196,20 +212,13 @@ def analyse(sample: Sample, backend: Backend, prompts: PromptStore,
     if unknown_skip:
         raise ValueError(f"skip không hỗ trợ: {sorted(unknown_skip)}")
 
-    run = _Run(backend, prompts)
+    run = _Run(backend)
     code = number_code(sample.code)
     proj_slot, name_slot = ((sample.file_name, sample.proj) if upstream_quirks
                             else (sample.proj, sample.file_name))
     context = "{}" if "context" in skip else sample.context
 
-    rec = {
-        "schema_version": SCHEMA_VERSION, "id": sample.id,
-        "decision": "unknown", "cwe_suspected": [], "sink": None,
-        "hypothesis_condition": None, "trigger_path": None, "evidence_or_guard": None,
-        "active_agents": [], "candidates": [], "issues": [],
-        "stage_counts": {"detection_agents": 0, "candidates": 0, "retained": 0},
-        "error": None,
-    }
+    rec = _new_record(sample)
 
     def step(stage: str, prompt: str) -> str:
         try:
@@ -311,6 +320,109 @@ def analyse(sample: Sample, backend: Backend, prompts: PromptStore,
                                        "FinalValidator bác bỏ mọi candidate"
     except _Stop as stop:
         rec["decision"] = "unknown"
+        rec["error"] = stop.info
+    return _finish(rec, run)
+
+
+def _assessments(raw: str) -> list | None:
+    obj = parse_json(raw)
+    if isinstance(obj, dict) and isinstance(obj.get("assessments"), list):
+        return obj["assessments"]
+    return None
+
+
+def _has_line_evidence(evidence: Any, source_lines: list[str]) -> bool:
+    if not isinstance(evidence, dict):
+        return False
+    line, quote = evidence.get("line"), evidence.get("quote")
+    return (type(line) is int and 1 <= line <= len(source_lines)
+            and isinstance(quote, str) and bool(quote.strip())
+            and quote.strip() == source_lines[line - 1].strip())
+
+
+def verify_candidates(sample: Sample, backend: Backend, prompts: PromptStore,
+                      candidates: list[dict]) -> dict:
+    """Kiểm chứng tĩnh v2 trên danh sách candidate cố định từ lượt đối chứng."""
+    run = _Run(backend)
+    rec = _new_record(sample)
+    refs = [{"issue_id": i, "cwe": issue.get("cwe"), "code_line": issue.get("code_line")}
+            for i, issue in enumerate(candidates, 1)]
+    rec["candidates"] = refs
+    rec["stage_counts"]["candidates"] = len(refs)
+    if not refs:
+        rec["decision"] = "benign"
+        rec["evidence_or_guard"] = "Aggregator không giữ candidate nào"
+        return _finish(rec, run)
+
+    code = number_code(sample.code)
+    source_lines = [line.partition(": ")[2] for line in code.split("\n")]
+    ref_text = json.dumps(refs, ensure_ascii=False)
+    stage = PRUNER
+    try:
+        # Thay placeholder một lượt để giữ nguyên dữ liệu có dấu ngoặc nhọn.
+        prune_prompt = prompts.get(PRUNER).format(
+            function_code=code, candidates=ref_text, code_context=sample.context)
+        prune_raw = run.call(PRUNER, prune_prompt, max_tokens=V2_PRUNER_MAX_TOKENS)
+        annotations = _assessments(prune_raw)
+        if annotations is None or run.trace[-1]["stop_reason"] in _TRUNCATED:
+            run.warnings.append(f"{PRUNER}: thiếu annotation đầy đủ, giữ toàn bộ candidate")
+            annotations = []
+
+        stage = VALIDATOR
+        final_prompt = prompts.get(VALIDATOR).format(
+            function_code=code, candidates=ref_text,
+            annotations=json.dumps(annotations, ensure_ascii=False))
+        final_raw = run.call(VALIDATOR, final_prompt)
+        judgments = _assessments(final_raw)
+        if judgments is None or run.trace[-1]["stop_reason"] in _TRUNCATED:
+            raise _Stop(VALIDATOR, "parse_error", "output kiểm chứng thiếu assessments đầy đủ")
+
+        by_id = {}
+        duplicate_ids = set()
+        for item in judgments:
+            issue_id = item.get("issue_id") if isinstance(item, dict) else None
+            if type(issue_id) is int:
+                if issue_id in by_id:
+                    duplicate_ids.add(issue_id)
+                by_id[issue_id] = item
+
+        kept, undecided = [], 0
+        for ref in refs:
+            issue_id = ref["issue_id"]
+            item = by_id.get(issue_id, {}) if issue_id not in duplicate_ids else {}
+            verdict, reason = item.get("verdict"), item.get("reason")
+            evidence, basis = item.get("evidence"), item.get("rejection_basis")
+            reason = reason.strip() if isinstance(reason, str) else ""
+            if verdict == "reject" and not (isinstance(basis, str) and basis in _REJECTION_BASES
+                                           and reason and _has_line_evidence(evidence, source_lines)):
+                verdict = "keep"
+                reason = "Thiếu bằng chứng mã nguồn để bác candidate"
+            if verdict not in ("keep", "reject"):
+                verdict = "undecided"
+                undecided += 1
+            entry = {**ref, "verdict": {"keep": "yes", "reject": "no"}.get(verdict, verdict),
+                     "reason": reason, "trigger_path": None,
+                     "rejection_basis": basis if verdict == "reject" else None,
+                     "evidence": evidence if verdict == "reject" else None}
+            rec["issues"].append(entry)
+            if verdict == "keep":
+                kept.append(entry)
+
+        rec["stage_counts"]["retained"] = len(kept)
+        if kept:
+            rec["decision"] = "vulnerable"
+            rec["cwe_suspected"] = [item["cwe"] for item in kept if item["cwe"]]
+            rec["sink"] = " | ".join(f"{item['cwe']} @ dòng {item['code_line']}"
+                                     for item in kept if item["code_line"]) or None
+        elif undecided:
+            raise _Stop(VALIDATOR, "schema_error", f"{undecided} issue thiếu phán quyết duy nhất")
+        else:
+            rec["decision"] = "benign"
+        rec["evidence_or_guard"] = " | ".join(item["reason"] for item in (kept or rec["issues"])
+                                              if item["reason"]) or None
+    except LLMError as error:
+        rec["error"] = {"stage": stage, "kind": "llm_error", "message": str(error)}
+    except _Stop as stop:
         rec["error"] = stop.info
     return _finish(rec, run)
 

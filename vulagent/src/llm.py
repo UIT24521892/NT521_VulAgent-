@@ -34,6 +34,10 @@ LLM_ERROR_SENTINEL = "ERROR: LLM call failed"
 class LLMError(Exception):
     """Lời gọi LLM không cho ra văn bản dùng được (lỗi mạng, timeout, thiếu output...)."""
 
+    def __init__(self, message: str, *, stop_reason: str | None = None):
+        super().__init__(message)
+        self.stop_reason = stop_reason
+
 
 @dataclass
 class LLMResult:
@@ -41,13 +45,14 @@ class LLMResult:
     prompt_tokens: int | None = None      # None = backend không đo được
     completion_tokens: int | None = None
     latency_s: float = 0.0
+    stop_reason: str | None = None
 
 
 class Backend:
     name = "base"
     model = "n/a"
 
-    def complete(self, agent: str, prompt: str) -> LLMResult:  # pragma: no cover
+    def complete(self, agent: str, prompt: str, *, max_tokens: int | None = None) -> LLMResult:  # pragma: no cover
         raise NotImplementedError
 
 
@@ -81,7 +86,7 @@ class ReplayBackend(Backend):
             return reports[0].get(key)
         return d.get(agent)
 
-    def complete(self, agent: str, prompt: str) -> LLMResult:
+    def complete(self, agent: str, prompt: str, *, max_tokens: int | None = None) -> LLMResult:
         out = self._lookup(agent)
         if not isinstance(out, str):
             raise LLMError(f"fixture không lưu output của {agent}")
@@ -92,20 +97,22 @@ class ReplayBackend(Backend):
 
 # ───────────────────────── Scripted (test) ─────────────────────────
 class ScriptedBackend(Backend):
-    """Trả lời theo dict {agent: str | Exception}. Thiếu agent → LLMError."""
+    """Trả lời theo dict {agent: str | LLMResult | Exception}. Thiếu agent → LLMError."""
     name = "scripted"
 
     def __init__(self, script: dict):
         self.script = script
         self.calls: list[tuple[str, str]] = []
 
-    def complete(self, agent: str, prompt: str) -> LLMResult:
+    def complete(self, agent: str, prompt: str, *, max_tokens: int | None = None) -> LLMResult:
         self.calls.append((agent, prompt))
         out = self.script.get(agent)
         if isinstance(out, Exception):
             raise out
         if out is None:
             raise LLMError(f"kịch bản không có output cho {agent}")
+        if isinstance(out, LLMResult):
+            return out
         return LLMResult(text=out, prompt_tokens=len(prompt) // 4, completion_tokens=len(out) // 4)
 
 
@@ -138,7 +145,7 @@ class OpenAICompatBackend(Backend):
         self.max_retries = max_retries
         self.max_tokens = max_tokens
 
-    def complete(self, agent: str, prompt: str) -> LLMResult:
+    def complete(self, agent: str, prompt: str, *, max_tokens: int | None = None) -> LLMResult:
         last = None
         for attempt in range(self.max_retries + 1):
             t0 = time.time()
@@ -147,24 +154,28 @@ class OpenAICompatBackend(Backend):
                     model=self.model,
                     messages=[{"role": "system", "content": self.SYSTEM},
                               {"role": "user", "content": prompt}],
-                    temperature=0.0, top_p=1.0, max_tokens=self.max_tokens,
+                    temperature=0.0, top_p=1.0, max_tokens=max_tokens or self.max_tokens,
                     extra_body={"enable_thinking": False},
                 )
-                text = (resp.choices[0].message.content or "").strip()
+                choice = resp.choices[0]
+                stop_reason = getattr(choice, "finish_reason", None)
+                text = (choice.message.content or "").strip()
                 if not text:
-                    raise LLMError("model trả nội dung rỗng")
+                    raise LLMError("model trả nội dung rỗng", stop_reason=stop_reason)
                 usage = getattr(resp, "usage", None)
                 return LLMResult(
                     text=text,
                     prompt_tokens=getattr(usage, "prompt_tokens", None),
                     completion_tokens=getattr(usage, "completion_tokens", None),
                     latency_s=time.time() - t0,
+                    stop_reason=stop_reason,
                 )
             except Exception as e:  # chỉ giữ tên lớp + thông điệp, không giữ header/khóa
                 last = e
                 if attempt < self.max_retries:
                     time.sleep(2 ** attempt)
-        raise LLMError(f"{agent}: {type(last).__name__}: {str(last)[:300]}")
+        raise LLMError(f"{agent}: {type(last).__name__}: {str(last)[:300]}",
+                       stop_reason=getattr(last, "stop_reason", None))
 
 
 # ───────────────────────── API thật — Claude ─────────────────────────
@@ -207,12 +218,12 @@ class AnthropicBackend(Backend):
         self._client = Anthropic(**kwargs)
         self.max_tokens = max_tokens
 
-    def complete(self, agent: str, prompt: str) -> LLMResult:
+    def complete(self, agent: str, prompt: str, *, max_tokens: int | None = None) -> LLMResult:
         t0 = time.time()
         try:
             resp = self._client.messages.create(
                 model=self.model,
-                max_tokens=self.max_tokens,
+                max_tokens=max_tokens or self.max_tokens,
                 system=self.SYSTEM,
                 messages=[{"role": "user", "content": prompt}],
                 output_config={"effort": self.effort},
@@ -220,16 +231,18 @@ class AnthropicBackend(Backend):
         except Exception as e:  # SDK tự retry; chỉ giữ tên lớp + thông điệp, không giữ key
             raise LLMError(f"{agent}: {type(e).__name__}: {str(e)[:300]}") from e
 
-        if getattr(resp, "stop_reason", None) == "refusal":
-            raise LLMError(f"{agent}: Claude từ chối (refusal) — không coi là benign")
+        stop_reason = getattr(resp, "stop_reason", None)
+        if stop_reason == "refusal":
+            raise LLMError(f"{agent}: Claude từ chối (refusal)", stop_reason=stop_reason)
         # Chỉ lấy khối văn bản, bỏ khối thinking.
         text = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text").strip()
         if not text:
-            raise LLMError(f"{agent}: model trả nội dung rỗng (stop_reason={getattr(resp, 'stop_reason', None)})")
+            raise LLMError(f"{agent}: model trả nội dung rỗng", stop_reason=stop_reason)
         usage = getattr(resp, "usage", None)
         return LLMResult(
             text=text,
             prompt_tokens=getattr(usage, "input_tokens", None),
             completion_tokens=getattr(usage, "output_tokens", None),
             latency_s=time.time() - t0,
+            stop_reason=stop_reason,
         )

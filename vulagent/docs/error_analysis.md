@@ -78,3 +78,15 @@ Trong 24 cặp đoán đúng cả hai vế, chỉ 5 cặp có candidate đúng C
 - **Ưu điểm thấy được:** FPR 24.10% và P-R 3.61%; khi bản vá thêm guard rõ ràng, khâu kiểm chứng trích đúng dòng guard để bác (143/144, 165/166).
 - **Nhược điểm thấy được:** recall 49.40%; 2/3 số FN là lỗ hổng đã được phát hiện rồi bị loại; hai trong ba cơ chế loại nhầm trái với mô tả trong bài ("thiếu bằng chứng thì giữ").
 - **Chỗ sửa cho tiêu chí 4** (chi tiết ở [PLAN.md](../PLAN.md) §0.2): (a) chỉ bác đường khi giả định bị bác là điều kiện cần để tới sink; (b) thiếu bằng chứng về nguồn dữ liệu thì giữ, không bác; (c) Pruner không được xóa issue; (d) nâng `max_tokens` cho Pruner và lưu `stop_reason`. Trần cải thiện về lý thuyết: 22 FN ở nhóm 2, 3, 5 (thêm 6 ca nhóm 4 nếu sửa cắt cụt); cái giá phải đo là FPR tăng trên 63 TN, trong đó 48 TN hiện được loại ở chính khâu này.
+
+Pilot khóa trước trên 56 mẫu cho kết quả **âm**. V2 cứu 26/28 FN và làm 19/28 TN thành FP theo nhãn SEVEN, vượt giới hạn 2 TN.
+
+| Phương án | FN → TP (28 mẫu) | TN → FP (28 mẫu) | P-C (12 cặp đủ) | Cả hai vế vulnerable | VPS trên 12 cặp |
+|---|---:|---:|---:|---:|---:|
+| Haiku gốc | 0 | 0 | 0 | 0 | 0% |
+| Giữ mọi candidate | 28 | 19 | 1 | 11 | 8,33% |
+| Kiểm chứng v2 | 26 | 19 | 1 | 11 | 8,33% |
+
+Trong đối chiếu hậu nghiệm, quy tắc “giữ mọi candidate” dự đoán vulnerable nếu Aggregator đã lưu ít nhất một candidate. Dự đoán của quy tắc này trùng với v2 ở **54/56 mẫu**. Hai mẫu khác là FN 45 và 121 mà v2 vẫn bác hết. Trên cả 12 cặp đủ hai vế, hai phương án cho cùng dự đoán. So với Haiku gốc, 11 cặp chuyển từ cả hai benign sang cả hai vulnerable. Chỉ cặp 39/40 được dự đoán đúng cả hai vế. Cả ba phương án có P-R bằng 0. Các cặp được chọn theo lỗi của đối chứng nên các tỷ lệ này chỉ mô tả tập pilot. [Bảng kết quả pilot, mục `post_hoc`](../results/tables/seven_claude_haiku_verification_v2_pilot.json)
+
+Validator trả 117 phán quyết giữ và 13 phán quyết bác ở mức issue. Bước kiểm tra trích dẫn không đổi phán quyết nào. Trên 47 mẫu có candidate, output Pruner gốc có 6 ca không parse được. V2 parse được cả 47 và API báo `end_turn` ở cả 47. V2 dùng lại candidate sau Aggregator và thay báo cáo TriggerPlanner bằng đánh giá tĩnh. Thí nghiệm đo hiệu ứng tổng hợp của thiết kế kiểm chứng trên danh sách candidate cố định, gồm thay đổi đầu vào, prompt và trần token.
