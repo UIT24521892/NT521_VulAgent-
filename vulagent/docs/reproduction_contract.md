@@ -7,9 +7,9 @@ Ngày: 2026-11-06. Mục đích: nói rõ mức nào là "tái hiện", mức n�
 | Mức | Định nghĩa | Điều kiện cần | Trạng thái hiện tại |
 |---|---|---|---|
 | **R1 — Tái hiện đúng cấu hình** | Chạy đúng model/dữ liệu/tham số/split của paper, báo ACC/P/R/F1/FPR/P-C/P-R/VPS trên **toàn** tập test | Key DashScope + ngân sách đủ 435 cặp PrimeVul (×3 lượt) và/hoặc SEVEN; prompt + metric đã đối chiếu paper | ❌ chưa (thiếu key/ngân sách; metric đã đối chiếu ACL 2026-11-09) |
-| **R2 — Tái hiện có thay thế khai báo** | Như R1 nhưng đổi backend (vd Qwen thay GPT-4o), 1 lượt thay 3, hoặc tập con có quy tắc lấy mẫu công khai; ghi rõ mọi thay thế | Key + ngân sách vừa phải | ❌ chưa |
-| **R3 — Thí nghiệm thu nhỏ** | Chạy một tập con nhỏ cố định theo ID (vd 10–20 cặp), đủ để tính bảng metric tính-lại-được, nêu rõ là mẫu nhỏ | Key + ngân sách tối thiểu | ❌ chưa — **mục tiêu khả thi đầu tiên khi có key** |
-| **R4 — Demo thủ công** | Chạy pipeline trên **một** cặp vulnerable/fixed, lưu trace từng agent (candidate → giả thuyết → kiểm điều kiện → quyết định) | Key cho ~vài chục lời gọi LLM | ⚠️ một nửa (2026-11-15): pipeline nhóm đã chạy cặp SEVEN idx 71/72 bằng **phát lại output công bố**, có trace đọc được; **chưa** chạy bằng model của nhóm — **mốc M2 của PLAN** |
+| **R2 — Tái hiện có thay thế khai báo** | Như R1 nhưng đổi backend (vd Qwen thay GPT-4o), 1 lượt thay 3, hoặc tập con có quy tắc lấy mẫu công khai; ghi rõ mọi thay thế | Key + ngân sách vừa phải | ⚠️ đang làm (2026-11-24): SEVEN 166 mẫu, Claude Haiku thay model của bài, 1 lượt; trạng thái từng thí nghiệm ở [PLAN §0](../PLAN.md) |
+| **R3 — Thí nghiệm thu nhỏ** | Chạy một tập con nhỏ cố định theo ID (vd 10–20 cặp), đủ để tính bảng metric tính-lại-được, nêu rõ là mẫu nhỏ | Key + ngân sách tối thiểu | ✅ vượt qua (đã chạy toàn bộ SEVEN) |
+| **R4 — Demo thủ công** | Chạy pipeline trên **một** cặp vulnerable/fixed, lưu trace từng agent (candidate → giả thuyết → kiểm điều kiện → quyết định) | Key cho ~vài chục lời gọi LLM | ✅ (2026-11-23) cặp SEVEN idx 71/72 chạy bằng Claude Haiku, có trace; còn thiếu kịch bản và video dự phòng |
 
 "Chạy ra một ví dụ" = R4 = demo, **không** phải tái hiện (khớp tiêu chí chấm: demo ≠ tái hiện toàn bộ).
 

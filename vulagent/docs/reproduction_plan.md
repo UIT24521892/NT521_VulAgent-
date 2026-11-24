@@ -1,6 +1,6 @@
 # docs/reproduction_plan.md — Kế hoạch tái hiện thí nghiệm VulAgent (Giai đoạn C, chia nhỏ)
 
-Ngày: 2026-11-06. Gắn với tiêu chí chấm #3 (5đ) và #4 (1đ) trong [../README.md](../README.md).
+Ngày: 2026-11-06. **Từ 2026-11-24, trạng thái và thứ tự ưu tiên hiện hành nằm ở [PLAN.md §0](../PLAN.md)**; các mốc C1–C4 dưới đây viết cho DashScope/Qwen trước khi nhóm chuyển sang Claude Haiku và đã được thay bằng bảng đó (C1–C3 coi như xong: đã chạy đủ 166 mẫu SEVEN). Gắn với tiêu chí chấm #3 (5đ) và #4 (1đ) trong [../README.md](../README.md).
 Căn cứ mã đã audit: [source_audit.md](source_audit.md). Mức tái hiện: xem [reproduction_contract.md](reproduction_contract.md).
 
 ---

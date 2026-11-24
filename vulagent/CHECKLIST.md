@@ -1,11 +1,32 @@
 # Checklist VulAgent
 
-- [ ] Nhóm diễn giải được vai trò từng giai đoạn bằng một ca mã nguồn thật.
-- [ ] Prototype chạy trọn một cặp vulnerable/fixed và lưu bằng chứng trung gian. (2026-11-15: đã chạy cặp SEVEN idx 71/72 bằng **phát lại output công bố**, trace ở `results/raw/`; còn thiếu lượt chạy bằng model của nhóm.)
-- [x] Schema, parse error và trường hợp thiếu context được xử lý rõ. (2026-11-15: lỗi LLM/parse → `unknown`, có test; `--skip context` cho ca thiếu context — chưa chạy với model thật.)
-- [ ] Tập mẫu, phiên bản paper/metric, cấu hình và ngày chạy được ghi lại.
-- [ ] Metric được kiểm tra bằng tay trên mẫu nhỏ; baseline dùng cùng tập mẫu.
-- [ ] Có một ablation đúng điều kiện so sánh và ít nhất 3 ca error analysis.
-- [ ] Báo cáo nêu phần nhóm thực sự hiện thực, phần dùng lại và giới hạn kết quả.
+Xếp theo tiêu chí chấm ở [REQUIREMENTS.md](REQUIREMENTS.md); trạng thái chi tiết ở [PLAN.md](PLAN.md) §0.
+
+## Tiêu chí 1–2 (4đ): hiểu bài toán, giải thích phương pháp
+- [ ] Nhóm diễn giải được vai trò từng giai đoạn bằng một trace thật (cặp 71/72).
+- [ ] Slide có bảng khác biệt arXiv ↔ ACL và lý do lấy ACL làm mốc.
+
+## Tiêu chí 3 (5đ): tái hiện + demo + biện luận
+- [x] Pipeline của nhóm chạy trọn một cặp bằng model thật, lưu trace (2026-11-23, Haiku, idx 71/72).
+- [x] Schema, lỗi parse → `unknown`, ca thiếu context được xử lý rõ (có test).
+- [x] Metric kiểm bằng selftest và khớp số công bố khi tính lại từ output của tác giả (Qwen3 SEVEN).
+- [x] RQ1: VulAgent trên SEVEN đủ 166 mẫu, 1 lượt (2026-11-24).
+- [ ] RQ1: baseline CoT cùng model, cùng ID.
+- [ ] RQ1: PrimeVul (toàn bộ hoặc tập con có quy tắc).
+- [ ] RQ2: bảng so backend (Qwen3/GPT-4o công bố tính lại + Haiku).
+- [ ] RQ3: SEVEN không context.
+- [ ] RQ4: bảng per-CWE.
+- [ ] RQ5 và ablation ACL: ghi rõ làm hay không và vì sao.
+- [ ] Kịch bản demo + video dự phòng + một ca candidate bị guard chặn.
+- [ ] Error analysis ≥ 3 ca (TP, FP bị loại, FN) + ưu/nhược + threats to validity.
+- [ ] Báo cáo nêu phần nhóm tự hiện thực, phần dùng lại, mọi khác biệt với bài (model, số lượt, tập mẫu).
+
+## Tiêu chí 4 (1đ): cải tiến
+- [ ] Đọc 35 trace FN bị loại ở khâu kiểm chứng, chốt chỗ sửa.
+- [ ] Ghi giả thuyết + tiêu chí thành công trước khi chạy.
+- [ ] Chạy bản cải tiến trên cùng 166 ID, so với lượt gốc.
+
+## Tái lập và an toàn
+- [ ] Tập mẫu, model, prompt hash, ngày chạy, chi phí của mỗi lượt nằm trong `run_meta.json`/manifest.
 - [ ] Không có API key/token trong repo hay log.
 - [ ] Người khác clone đúng commit, dùng key riêng, chạy theo README và tạo lại bảng từ kết quả thô.
