@@ -36,8 +36,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from llm import AnthropicBackend, OpenAICompatBackend, ReplayBackend, LLMError  # noqa: E402
-from pipeline import V2_PRUNER_MAX_TOKENS, PromptStore, Sample, analyse, verify_candidates  # noqa: E402
+from llm import AnthropicBackend, OpenAICompatBackend, PrefixReplayBackend, ReplayBackend, LLMError  # noqa: E402
+from pipeline import (PRUNER, V2_PRUNER_MAX_TOKENS, VALIDATOR, PromptStore, Sample,  # noqa: E402
+                      analyse, verify_candidates)
 from schema import validate_prototype_output                   # noqa: E402
 
 UPSTREAM = ROOT / "upstream" / "VulAgent"
@@ -130,6 +131,9 @@ def run_pipeline(stack: ExitStack) -> int:
     ap.add_argument("--prompts", type=Path, help="Thư mục prompt template")
     ap.add_argument("--verification-v2-from", type=Path, metavar="BASELINE_DIR",
                     help="Kiểm chứng tĩnh v2 trên candidate đã lưu của lượt đối chứng")
+    ap.add_argument("--reuse-prefix-from", type=Path, metavar="BASELINE_DIR",
+                    help="Phát lại output MetaAgent → TriggerPlanner từ trace của lượt này; "
+                         "chỉ gọi API cho UnifiedPruner + FinalValidator (RQ3 tách biến)")
     ap.add_argument("--ids", help="Chỉ chạy các idx này (phân tách bằng dấu phẩy)")
     ap.add_argument("--ids-file", type=Path, help="File chứa idx, mỗi dòng một idx")
     ap.add_argument("--limit", type=int, help="Chỉ chạy N mẫu đầu (sau khi lọc --ids)")
@@ -143,6 +147,9 @@ def run_pipeline(stack: ExitStack) -> int:
     if args.verification_v2_from and (
             args.backend != "api" or args.skip or args.prompts or args.no_upstream_quirks):
         ap.error("--verification-v2-from cần --backend api và cấu hình v2 mặc định có context")
+    if args.reuse_prefix_from and (args.backend != "api" or args.verification_v2_from
+                                   or "pruner" in args.skip):
+        ap.error("--reuse-prefix-from cần --backend api, không dùng cùng v2 hay --skip pruner")
     prompt_dir = (VERIFICATION_PROMPTS if args.verification_v2_from
                   else args.prompts or DEFAULT_PROMPTS)
     if not prompt_dir.is_dir():
@@ -208,6 +215,17 @@ def run_pipeline(stack: ExitStack) -> int:
             "prompt_sha256": prompts.sha256_all(),
         }
 
+    prefix = None
+    if args.reuse_prefix_from:
+        try:
+            pmeta = json.loads((args.reuse_prefix_from / "run_meta.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError) as e:
+            ap.error(f"không đọc được run_meta của lượt gốc: {e}")
+        if (pmeta.get("provider"), pmeta.get("model")) != (args.provider, api_backend.model):
+            ap.error("lượt gốc phải cùng provider/model với lượt này")
+        prefix = {"from": str(args.reuse_prefix_from), "baseline_skip": pmeta.get("skip"),
+                  "live_agents": [PRUNER, VALIDATOR]}
+
     (args.out / "traces").mkdir(parents=True, exist_ok=True)
     pred_path = args.out / "predictions.jsonl"
     config_path = args.out / "verification_config.json"
@@ -262,6 +280,11 @@ def run_pipeline(stack: ExitStack) -> int:
             else:
                 backend = api_backend
                 provenance["model"] = backend.model
+                if prefix is not None:
+                    tpath = args.reuse_prefix_from / "traces" / f"{sid}_L{line_no}.json"
+                    trace = json.loads(tpath.read_text(encoding="utf-8"))["trace"]
+                    backend = PrefixReplayBackend(trace, api_backend, prefix["live_agents"])
+                    provenance["prefix_from"] = str(tpath)
 
             sample = Sample.from_record(rec)
             if verification is not None:
@@ -319,6 +342,8 @@ def run_pipeline(stack: ExitStack) -> int:
     }
     if verification is not None:
         meta["verification"] = verification
+    if prefix is not None:
+        meta["prefix_replay"] = prefix
     (args.out / "run_meta.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
 
     print(f"Đã chạy {n_done} mẫu ({args.backend}). Quyết định: {dict(decisions)}")

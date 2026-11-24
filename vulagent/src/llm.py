@@ -21,6 +21,7 @@ Ba backend:
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import time
@@ -114,6 +115,46 @@ class ScriptedBackend(Backend):
         if isinstance(out, LLMResult):
             return out
         return LLMResult(text=out, prompt_tokens=len(prompt) // 4, completion_tokens=len(out) // 4)
+
+
+# ───────────────────────── Phát lại phần đầu pipeline ─────────────────────────
+class PrefixReplayBackend(Backend):
+    """Phát lại output đã lưu trong trace của một lượt trước cho các agent không thuộc
+    `live_agents`; agent trong `live_agents` gọi backend thật.
+
+    Dùng cho thí nghiệm tách một biến (vd RQ3: giữ nguyên MetaAgent → TriggerPlanner,
+    chỉ chạy lại Pruner + Validator với context rỗng). Prompt của agent phát lại phải
+    trùng hash với trace; lệch là lỗi cấu hình nên ném PrefixMismatch (không phải
+    LLMError) để lượt chạy dừng hẳn thay vì ghi `unknown`.
+    """
+    name = "prefix-replay"
+
+    def __init__(self, trace: list[dict], live: Backend, live_agents):
+        self.live = live
+        self.model = live.model
+        self.live_agents = set(live_agents)
+        self._queue: dict[str, list[dict]] = {}
+        for entry in trace:
+            self._queue.setdefault(entry["agent"], []).append(entry)
+
+    def complete(self, agent: str, prompt: str, *, max_tokens: int | None = None) -> LLMResult:
+        if agent in self.live_agents:
+            return (self.live.complete(agent, prompt, max_tokens=max_tokens)
+                    if max_tokens is not None else self.live.complete(agent, prompt))
+        queue = self._queue.get(agent)
+        if not queue:
+            raise PrefixMismatch(f"trace không còn lời gọi {agent} để phát lại")
+        entry = queue.pop(0)
+        if entry.get("prompt_sha256") != hashlib.sha256(prompt.encode("utf-8")).hexdigest():
+            raise PrefixMismatch(f"prompt {agent} khác trace (hash không trùng)")
+        if not isinstance(entry.get("output"), str):
+            raise PrefixMismatch(f"trace không lưu output của {agent}")
+        return LLMResult(text=entry["output"], prompt_tokens=0, completion_tokens=0,
+                         stop_reason="replayed")
+
+
+class PrefixMismatch(RuntimeError):
+    """Prompt hoặc trace không khớp khi phát lại phần đầu pipeline."""
 
 
 # ───────────────────────── API thật ─────────────────────────
