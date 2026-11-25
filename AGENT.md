@@ -9,7 +9,7 @@ Nhóm 3 sinh viên, môn **NT521 – Lập trình khai thác lỗ hổng**. Hai 
 | Phần | Thư mục | Sản phẩm | Trạng thái |
 |---|---|---|---|
 | Mini seminar **S05 – Return-to-libc (ret2libc)** | [seminar_S05/](seminar_S05/) | Slide 12–14 trang + demo CTF + CVE, 20–30 phút | **TẠM DỪNG (2026-11-23)**: demo `split` ra flag (lần 1) + nội dung 10 mục đã có; còn demo lần 2 + ảnh evidence + file slide. Dừng theo yêu cầu người dùng để dồn sức VulAgent |
-| Đề tài **VulAgent** (đề CK19) – phát hiện lỗ hổng bằng lập và kiểm chứng giả thuyết | [vulagent/](vulagent/) | Mã pipeline, dữ liệu đánh giá, báo cáo, slide | **🎯 TRỌNG TÂM HIỆN TẠI**: đã chạy SEVEN đủ 166 mẫu bằng Claude Haiku (2026-11-24) và đối chiếu arXiv ↔ ACL; còn baseline, có/không context, PrimeVul, cải tiến — xem bảng trạng thái ở [vulagent/PLAN.md](vulagent/PLAN.md) §0 |
+| Đề tài **VulAgent** (đề CK19) – phát hiện lỗ hổng bằng lập và kiểm chứng giả thuyết | [vulagent/](vulagent/) | Mã pipeline, dữ liệu đánh giá, báo cáo, slide | **🎯 TRỌNG TÂM HIỆN TẠI**: đã có RQ1 (SEVEN), RQ2, RQ3, RQ4 bằng Claude Haiku và pilot cải tiến (kết quả âm); còn baseline CoT, PrimeVul, demo, biện luận, báo cáo/slide. Việc chia cho thành viên ở [vulagent/PLAN.md](vulagent/PLAN.md) §0.4 (cập nhật 2026-11-25) |
 
 **Git (từ 2026-11-24):** `seminar_S01/` và `seminar_S05/` đã gỡ khỏi repo và nằm trong `.gitignore`; file vẫn ở máy, bản cũ còn trong lịch sử git. Repo trên GitHub chỉ chứa VulAgent. Không `git add` lại hai thư mục này khi người dùng chưa yêu cầu.
 
