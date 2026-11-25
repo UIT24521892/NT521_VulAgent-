@@ -14,8 +14,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from llm import LLMError, ReplayBackend, ScriptedBackend, LLM_ERROR_SENTINEL  # noqa: E402
-from pipeline import PromptStore, Sample, analyse, number_code, parse_json     # noqa: E402
+from llm import LLMError, LLMResult, ReplayBackend, ScriptedBackend, LLM_ERROR_SENTINEL  # noqa: E402
+from pipeline import PromptStore, Sample, analyse, analyse_cot, number_code, parse_json  # noqa: E402
 from schema import validate_prototype_output                                   # noqa: E402
 import metrics                                                                 # noqa: E402
 
@@ -168,6 +168,104 @@ class PipelineTest(unittest.TestCase):
         broken = dict(fixture, AnalyzerAgent=LLM_ERROR_SENTINEL)
         rec = analyse(self.sample, ReplayBackend(broken), self.prompts)
         self.assertEqual((rec["decision"], rec["error"]["stage"]), ("unknown", "AnalyzerAgent"))
+
+
+COT_PROMPT_DIR = ROOT / "prompts_cot"
+
+
+def cot_out(decision="vulnerable", cwe="CWE-78"):
+    return ("Bước 1: cmd do caller truyền vào. Bước 2: dòng 2 gọi os.system(cmd) {không có guard}.\n"
+            "```python\nos.system(cmd)\n```\n"
+            "```json\n" + json.dumps({"decision": decision, "cwe": cwe,
+                                      "reason": "dòng 2 đưa cmd chưa lọc vào os.system"}) + "\n```")
+
+
+class CoTTest(unittest.TestCase):
+    """Baseline CoT (PLAN §0.4 T2): 1 lời gọi/mẫu, JSON hỏng → unknown, không lộ nhãn."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.prompts = PromptStore(COT_PROMPT_DIR)      # dùng đúng prompt sẽ chạy thật
+        cls.sample = Sample(id="7", code="def f(cmd):\n    os.system(cmd)",
+                            file_name="a.py", proj="{'repo': 'r'}", context="{'imports': ['os']}")
+
+    def run_cot(self, out, **kw):
+        backend = ScriptedBackend({"CoTAgent": out})
+        rec = analyse_cot(self.sample, backend, self.prompts, **kw)
+        ok, errs, _ = validate_prototype_output(rec)
+        self.assertTrue(ok, errs)
+        self.assertEqual(len(backend.calls), 1)           # đúng 1 lời gọi mỗi mẫu
+        self.assertEqual(rec["cost"]["llm_calls"], 1)
+        return rec, backend.calls[0][1]
+
+    def test_prompt_has_code_and_context(self):
+        _, prompt = self.run_cot(cot_out())
+        self.assertIn("   2:     os.system(cmd)", prompt)
+        self.assertIn("{'imports': ['os']}", prompt)
+        self.assertNotIn("{function_code}", prompt)
+        self.assertNotIn("{code_context}", prompt)
+
+    def test_valid_vulnerable_and_benign(self):
+        rec, _ = self.run_cot(cot_out())
+        self.assertEqual((rec["decision"], rec["pred"], rec["error"]), ("vulnerable", 1, None))
+        self.assertEqual(rec["cwe_suspected"], ["CWE-78"])
+        self.assertIn("os.system", rec["evidence_or_guard"])
+        self.assertEqual([t["agent"] for t in rec["trace"]], ["CoTAgent"])
+        rec, _ = self.run_cot(cot_out("Benign", "None"))
+        self.assertEqual((rec["decision"], rec["pred"], rec["cwe_suspected"]), ("benign", 0, []))
+
+    def test_bare_json_after_reasoning_with_braces(self):
+        out = 'int f() { if (n > 8) { return -1; } }\nKết luận: {"decision": "benign", "cwe": "None", "reason": "có kiểm tra n"}'
+        rec, _ = self.run_cot(out)
+        self.assertEqual(rec["decision"], "benign")
+
+    def test_broken_output_is_unknown_not_benign(self):
+        cases = {
+            "parse_error": ["tôi nghĩ là an toàn", '```json\n{"decision": "benign", "cwe": \n```', ""],
+            "schema_error": ['{"decision": "maybe", "reason": "?"}', '{"decision": null}'],
+        }
+        for kind, outs in cases.items():
+            for out in outs:
+                with self.subTest(out=out):
+                    rec, _ = self.run_cot(out)
+                    self.assertEqual((rec["decision"], rec["pred"]), ("unknown", None))
+                    self.assertEqual((rec["error"]["stage"], rec["error"]["kind"]), ("CoTAgent", kind))
+
+    def test_missing_decision_key_is_unknown(self):
+        rec, _ = self.run_cot('{"cwe": "CWE-78", "reason": "x"}')
+        self.assertEqual((rec["decision"], rec["error"]["kind"]), ("unknown", "parse_error"))
+
+    def test_truncated_output_is_unknown(self):
+        out = LLMResult(text=cot_out(), prompt_tokens=10, completion_tokens=10, stop_reason="max_tokens")
+        rec, _ = self.run_cot(out)
+        self.assertEqual((rec["decision"], rec["error"]["kind"]), ("unknown", "parse_error"))
+
+    def test_llm_error_is_unknown(self):
+        rec, _ = self.run_cot(LLMError("timeout"))
+        self.assertEqual((rec["decision"], rec["error"]["kind"]), ("unknown", "llm_error"))
+
+    def test_skip_context_and_invalid_skip(self):
+        _, prompt = self.run_cot(cot_out(), skip=("context",))
+        self.assertNotIn("['os']", prompt)
+        self.assertIn("is available:\n{}\n", prompt)
+        with self.assertRaises(ValueError):
+            analyse_cot(self.sample, ScriptedBackend({"CoTAgent": cot_out()}), self.prompts, skip=("pruner",))
+
+    def test_label_never_reaches_prompt(self):
+        record = {"idx": 7, "func": "int f(){return 0;}", "file_name": "a.c", "target": 1,
+                  "cwe": ["CWE-LABEL-SECRET"], "cve": "CVE-LABEL-SECRET", "commit_message": "fix LABEL-SECRET",
+                  "context": "{}"}
+        backend = ScriptedBackend({"CoTAgent": cot_out()})
+        analyse_cot(Sample.from_record(record), backend, self.prompts)
+        self.assertNotIn("LABEL-SECRET", backend.calls[0][1])
+
+    def test_code_with_slot_text_is_not_substituted_twice(self):
+        sample = Sample(id="8", code='char *s = "{code_context}";', context="CTX-MARKER")
+        backend = ScriptedBackend({"CoTAgent": cot_out()})
+        analyse_cot(sample, backend, self.prompts)
+        prompt = backend.calls[0][1]
+        self.assertIn('"{code_context}"', prompt)
+        self.assertEqual(prompt.count("CTX-MARKER"), 1)
 
 
 class HelperTest(unittest.TestCase):

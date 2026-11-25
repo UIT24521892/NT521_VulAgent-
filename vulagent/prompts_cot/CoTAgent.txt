@@ -1,0 +1,17 @@
+You are a software security expert. Decide whether the function below contains a security vulnerability.
+
+Function under analysis (line numbers were added for reference):
+{function_code}
+
+Additional code context from the same project (callers, callees, globals, type definitions, imports). "{}" means no context is available:
+{code_context}
+
+Think step by step before you decide:
+1. Summarize what the function does and which inputs can be influenced by a caller or an attacker.
+2. List the security-sensitive operations (sinks), for example memory reads/writes and copies, size or index arithmetic, pointer use and free, command/SQL/path construction, parsing of external data, permission or authentication checks, resource allocation and release.
+3. For each sink, trace whether attacker-influenced data can reach it, and under which condition.
+4. Check the guards on every path to that sink: bounds and length checks, NULL checks, sanitization, error handling, locking. Use the context to confirm or refute your assumptions about callers and callees.
+5. Conclude "vulnerable" only if at least one sink is reachable with unsafe data on a path that no guard blocks. Otherwise conclude "benign".
+
+Write your reasoning first. Then finish with exactly one JSON object inside a ```json block, in this format:
+{"decision": "vulnerable" or "benign", "cwe": "CWE-<id> of the most likely weakness, or \"None\" when benign", "reason": "one or two sentences that cite the line numbers of the source, the sink and the missing or present guard"}

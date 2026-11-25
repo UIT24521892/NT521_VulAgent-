@@ -9,6 +9,7 @@ Hai chế độ:
           --out results/raw/<tên_lượt>
   --backend api      gọi model thật, TỐN PHÍ. Bắt buộc --confirm-paid và --limit/--ids;
       key đọc từ vulagent/.env hoặc biến môi trường (xem .env.example).
+  --mode cot         baseline CoT 1 lời gọi/mẫu (prompt prompts_cot/CoTAgent.txt), cần --backend api.
 
 Đầu ra trong --out:
   predictions.jsonl  mỗi dòng một bản ghi (không kèm trace) — đưa thẳng vào metrics.py --pred
@@ -38,12 +39,13 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from llm import AnthropicBackend, OpenAICompatBackend, PrefixReplayBackend, ReplayBackend, LLMError  # noqa: E402
 from pipeline import (PRUNER, V2_PRUNER_MAX_TOKENS, VALIDATOR, PromptStore, Sample,  # noqa: E402
-                      analyse, verify_candidates)
+                      analyse, analyse_cot, verify_candidates)
 from schema import validate_prototype_output                   # noqa: E402
 
 UPSTREAM = ROOT / "upstream" / "VulAgent"
 DEFAULT_PROMPTS = UPSTREAM / "Quickly reproduce the experiment" / "prompt_template"
 VERIFICATION_PROMPTS = ROOT / "prompts_v2"
+COT_PROMPTS = ROOT / "prompts_cot"
 FIXTURE_IDX = re.compile(r"_(\d+)_full\.json$")
 
 
@@ -123,6 +125,9 @@ def run_pipeline(stack: ExitStack) -> int:
     ap = argparse.ArgumentParser(description="Chạy pipeline VulAgent của nhóm.")
     ap.add_argument("--data", type=Path, required=True, help="File .jsonl (idx, func, ...)")
     ap.add_argument("--out", type=Path, required=True, help="Thư mục kết quả (vd results/raw/<tên>)")
+    ap.add_argument("--mode", choices=["vulagent", "cot"], default="vulagent",
+                    help="vulagent: pipeline đầy đủ; cot: baseline CoT 1 lời gọi/mẫu "
+                         "(prompt ở prompts_cot/, chỉ dùng với --backend api)")
     ap.add_argument("--backend", choices=["replay", "api"], default="replay")
     ap.add_argument("--provider", choices=["dashscope", "anthropic"], default="dashscope",
                     help="Nhà cung cấp cho --backend api: dashscope (Qwen, đúng paper) hoặc "
@@ -150,8 +155,11 @@ def run_pipeline(stack: ExitStack) -> int:
     if args.reuse_prefix_from and (args.backend != "api" or args.verification_v2_from
                                    or "pruner" in args.skip):
         ap.error("--reuse-prefix-from cần --backend api, không dùng cùng v2 hay --skip pruner")
+    if args.mode == "cot" and (args.backend != "api" or args.verification_v2_from
+                               or args.reuse_prefix_from or "pruner" in args.skip):
+        ap.error("--mode cot cần --backend api, không dùng cùng v2, --reuse-prefix-from hay --skip pruner")
     prompt_dir = (VERIFICATION_PROMPTS if args.verification_v2_from
-                  else args.prompts or DEFAULT_PROMPTS)
+                  else args.prompts or (COT_PROMPTS if args.mode == "cot" else DEFAULT_PROMPTS))
     if not prompt_dir.is_dir():
         ap.error(f"không thấy thư mục prompt: {prompt_dir}")
 
@@ -290,6 +298,9 @@ def run_pipeline(stack: ExitStack) -> int:
             if verification is not None:
                 result = verify_candidates(sample, backend, prompts, baseline[line_no]["candidates"])
                 provenance["variant"] = verification["variant"]
+            elif args.mode == "cot":
+                result = analyse_cot(sample, backend, prompts, skip=tuple(args.skip))
+                provenance["variant"] = "cot"
             else:
                 result = analyse(sample, backend, prompts,
                                  upstream_quirks=not args.no_upstream_quirks, skip=tuple(args.skip))
@@ -325,6 +336,7 @@ def run_pipeline(stack: ExitStack) -> int:
     meta = {
         "run_at": dt.datetime.now().astimezone().isoformat(timespec="seconds"),
         "command": " ".join(sys.argv),
+        "mode": args.mode, "prompt_dir": str(prompt_dir),
         "data": str(args.data), "backend": args.backend,
         "provider": args.provider if args.backend == "api" else None,
         "replay_dir": str(args.replay_dir) if args.replay_dir else None,

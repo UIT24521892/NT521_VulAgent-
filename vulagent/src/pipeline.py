@@ -16,6 +16,8 @@ Khác repo gốc (có chủ đích, phải khai báo khi báo cáo):
      KHÔNG rơi về benign (source_audit §7.2).
   2. Nhãn thật không đi vào module này: `Sample` không có trường target/cwe.
   3. Mỗi lời gọi được ghi trace (agent, hash prompt, output) và đếm chi phí.
+`analyse_cot()` là baseline CoT 1 lời gọi/mẫu (RQ1, PLAN §0.4 T2), prompt ở `prompts_cot/`.
+
 Giữ nguyên để tái hiện (bật bằng `upstream_quirks=True`): repo gốc gọi
 `analyse(code, name, proj, context)` trong khi chữ ký là `(src_code, proj, name, context)`
 nên `{proj}` nhận tên file còn `{name}` nhận chuỗi proj.
@@ -321,6 +323,85 @@ def analyse(sample: Sample, backend: Backend, prompts: PromptStore,
     except _Stop as stop:
         rec["decision"] = "unknown"
         rec["error"] = stop.info
+    return _finish(rec, run)
+
+
+# ───────────────────────── Baseline CoT (RQ1, PLAN §0.4 T2) ─────────────────────────
+COT = "CoTAgent"
+_COT_DECISIONS = ("vulnerable", "benign")
+_COT_SLOT = re.compile(r"\{(function_code|code_context)\}")
+_COT_JSON_START = re.compile(r'\{\s*"decision"\s*:')
+
+
+def _cot_json(text: str) -> dict | None:
+    """Lấy object JSON có khóa `decision` ở cuối output CoT.
+
+    Phần suy luận phía trước có thể chứa khối mã hay dấu ngoặc nhọn của C, nên không dùng
+    `parse_json` (vốn lấy khối ``` đầu tiên hoặc cắt từ ngoặc mở đầu tiên). Duyệt các
+    khối ``` từ cuối lên, rồi các vị trí `{"decision":` từ cuối lên."""
+    s = text or ""
+    for block in reversed(_FENCE.findall(s)):
+        obj = parse_json(block)
+        if isinstance(obj, dict) and "decision" in obj:
+            return obj
+    decoder = json.JSONDecoder()
+    for m in reversed(list(_COT_JSON_START.finditer(s))):
+        try:
+            obj, _ = decoder.raw_decode(s, m.start())
+        except ValueError:
+            continue
+        if isinstance(obj, dict):
+            return obj
+    return None
+
+
+def analyse_cot(sample: Sample, backend: Backend, prompts: PromptStore, skip: tuple = ()) -> dict:
+    """Baseline CoT: đúng 1 lời gọi mỗi mẫu, cùng mã hàm đánh số dòng và context như VulAgent.
+
+    Prompt chỉ nhận `{function_code}` và `{code_context}`; `Sample` không có nhãn/CWE/CVE nên
+    không thể lọt vào prompt. Lỗi LLM, JSON hỏng hoặc `decision` ngoài {vulnerable, benign}
+    → `unknown` kèm `error`, KHÔNG quy về benign.
+    """
+    unknown_skip = set(skip) - {"context"}
+    if unknown_skip:
+        raise ValueError(f"skip không hỗ trợ cho CoT: {sorted(unknown_skip)}")
+
+    run = _Run(backend)
+    rec = _new_record(sample)
+    slots = {"function_code": number_code(sample.code),
+             "code_context": "{}" if "context" in skip else sample.context}
+    # Thay một lượt để mã hàm/context có chứa "{code_context}" không bị thay tiếp.
+    prompt = _COT_SLOT.sub(lambda m: slots[m.group(1)], prompts.get(COT))
+    try:
+        raw = run.call(COT, prompt)
+    except LLMError as e:
+        rec["error"] = {"stage": COT, "kind": "llm_error", "message": str(e)}
+        return _finish(rec, run)
+
+    # Output bị cắt thì JSON tìm được (nếu có) có thể chỉ là ví dụ trong phần suy luận → unknown.
+    if run.trace[-1].get("stop_reason") in _TRUNCATED:
+        rec["error"] = {"stage": COT, "kind": "parse_error", "message": "output bị cắt do max_tokens"}
+        return _finish(rec, run)
+    obj = _cot_json(raw)
+    if obj is None:
+        rec["error"] = {"stage": COT, "kind": "parse_error",
+                        "message": "output không có JSON chứa 'decision'"}
+        return _finish(rec, run)
+    decision = str(obj.get("decision", "")).strip().lower()
+    if decision not in _COT_DECISIONS:
+        rec["error"] = {"stage": COT, "kind": "schema_error",
+                        "message": f"decision={obj.get('decision')!r} không thuộc {_COT_DECISIONS}"}
+        return _finish(rec, run)
+
+    reason = obj.get("reason")
+    reason = reason.strip() if isinstance(reason, str) and reason.strip() else None
+    rec["decision"] = decision
+    rec["evidence_or_guard"] = reason
+    if decision == "vulnerable":
+        cwe = obj.get("cwe")
+        if isinstance(cwe, str) and cwe.strip() and cwe.strip().lower() not in ("none", "n/a", "null"):
+            rec["cwe_suspected"] = [cwe.strip()]
+        rec["hypothesis_condition"] = reason
     return _finish(rec, run)
 
 
